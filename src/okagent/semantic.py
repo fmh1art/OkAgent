@@ -86,14 +86,22 @@ class SemanticOperator:
                               {"role": "user", "content": prompt}],
                     **config["label_kwargs"],
                 )
-            result = json.loads(response.choices[0].message.content)
+            raw = response.choices[0].message.content
+            metadata = dict(_usage=response.usage.model_dump() if response.usage else {},
+                            _latency_seconds=time.monotonic() - started)
+            db.execute("UPDATE queries SET response=? WHERE call_id=?",
+                       [json.dumps(dict(_raw_response=raw, **metadata), ensure_ascii=False), call_id])
+            db.commit()  # Preserve billed usage even if the model returned invalid JSON.
+            content = (raw or "").strip()
+            if content.startswith("```") and content.endswith("```"):
+                content = content.split("\n", 1)[-1].rsplit("```", 1)[0]
+            result = json.loads(content, strict=False)  # Some endpoints leave literal newlines in explanations.
             if (not isinstance(result, dict) or result.get("candidate_id") != candidate_id
                     or not isinstance(result.get("is_match"), dict)
                     or type(result["is_match"].get("result")) is not bool):
                 raise ValueError("Expected the requested candidate_id and a boolean is_match.result")
             label = int(result["is_match"]["result"])
-            result["_usage"] = response.usage.model_dump() if response.usage else {}
-            result["_latency_seconds"] = time.monotonic() - started
+            result.update(metadata)
             db.execute("UPDATE queries SET label=?,response=? WHERE call_id=?",
                        [label, json.dumps(result, ensure_ascii=False), call_id])
             db.commit()

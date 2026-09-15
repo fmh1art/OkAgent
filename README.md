@@ -237,6 +237,7 @@ print(op.usage())                # llm_calls、max_calls、remaining
 - 成功标签缓存在 `output/semantic.sqlite`，重复查询直接返回；多个脚本共用计数与缓存。
 - 每个 ID 单独去重，预算预留时短暂加全局锁；独立候选人的网络请求可并发。失败占预算且不自动重试。
 - `_config/llm.json` 可用 `label_kwargs` 设置标注请求参数；示例关闭豆包深度思考并设 temperature=0，不影响 code agent 的模型参数。
+- 示例还启用 JSON 输出模式。标注器允许代码围栏和说明文字中的换行，仍严格检查 ID 和布尔结果；解析失败的响应也保存用量。
 - 请求前持久化计数，失败、超时和非法 JSON 都占一次预算，不自动重试；再次显式调用失败 ID 会再计一次。
 - 预算耗尽抛出 `BudgetExceeded`，成功缓存仍可读取。不要修改缓存或在同一工作区更换岗位、模型和规则。
 - `output/usage.json` 自动更新；评估直接从 SQLite 请求记录读取次数，`usage_source="semantic_operator"`。
@@ -410,3 +411,21 @@ python -m pytest tests other_methods/hydra/tests -q
 agent 测试使用本地模拟模型接口与确定性 code agent 消息，实际执行 Python/训练代码，不产生外部 API 开销；它们不代表真实模型的实验效果。
 未安装 agent 依赖时，agent 测试会跳过。
 直接运行 `python -m pytest -q` 默认只发现主项目的 `tests/`；检查复现方法时需要显式指定上面的路径。
+
+## Agent 与 Hydra 实验比较
+
+实验结果和逐轮修改见 [comparison_report.md](comparison_report.md)，不含简历内容的统计保存在 `benchmarks/results.json`。
+安装上述 agent 环境和 `other_methods/hydra/requirements.txt` 后，从项目根目录调用函数：
+
+```python
+from benchmarks.compare import snapshot, run_case
+
+snapshot('my_comparison')  # 名称不可重复；保存源代码、参数和依赖版本
+run_case('my_comparison', 'baseline', 'job01')
+run_case('my_comparison', 'lo_ph', 'job01')
+run_case('my_comparison', 'hydra', 'job01')  # 真实逐人 LLM 标注
+# 可选诊断：回放历史标签，无真实标注请求，不与真实标注结果混为一谈
+run_case('my_comparison', 'hydra_replay', 'job01')
+```
+
+长任务建议设置 `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1`。每个方法有独立 workspace、2,000 次预算、标签缓存和轨迹；运行前须配置本地 `_config/llm.json`。结果包含简历信息，保留在 Git 忽略的 `results/comparison/` 中。

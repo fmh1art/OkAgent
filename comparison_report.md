@@ -26,6 +26,27 @@
 
 修复后 38 项测试通过，包含并发同 ID 去重、独立请求重叠、并发不超预算，以及 Hydra 串行/并发输出一致。R0 是工程诊断轮，不把未完成实验记为零召回。
 
+### R1：并发真实调用与端到端运行
+
+起点 `73d80da`，最大并发请求数的 prompt 建议为 8。方法可选择更低并发，因此墙钟耗时同时包含 agent 的实现选择。
+
+运行中修复（同一轮保留缓存与预算）：
+- Hydra 在第 128 次尝试后因 JSON 说明文字中的未转义换行中止；修复解析器后从缓存重新执行确定性的采样流程，原失败仍记账。
+- baseline 的无必要 matplotlib 导入失败，由 agent 自行删去；后续出现 JSON 分隔符错误。标注接口统一启用 JSON 输出模式，另一次通用 API 探针验证成功，消耗 64 tokens。
+- 解析器容忍代码围栏和字符串换行，仍核验 candidate_id 与布尔 is_match.result；保存失败响应的可用 token 统计。
+- 修复前后的源文件和配置保存在 `results/comparison/r1/repairs/`。因此 R1 是含工程干预的开发轮，后续新工作区检验稳定配置。
+
+两层 agent 在约 709 秒时因多次重复的产物格式错误被停止（250 次尝试、249 个成功标签、5 个正例），未形成部署结果。baseline 和 Hydra 继续运行。baseline 自行生成的阈值代码取 PR 曲线第一个合格项，实际趋向最低阈值；后续完整结果将保留这一缺陷，不由评测脚本替它调参。
+
+### R2：将运行经验和 proxy 方法写入简短 prompt
+
+- 两个 agent 共用 `PROXY_SKILL`：监督 embedding + 平衡 LR、随机与高分/边界混合采样、独立验证、选满足召回目标的最大阈值。
+- 解释聚类弱不等于监督向量分类无效；批量读库并缓存特征，避免数万次逐人 SQL。
+- 物理 agent 提交前核验 JSON 数组和字符串 summary；接口给出字段级错误并拒绝 JSONL，规划 agent 必须修复原产物格式，不能换样本回避。
+- 保持 function 调用 → 同 workspace 新 code agent 的结构；没有增加服务、CLI 或新规划框架。
+
+R2 将从全新缓存运行，标签配置从开始固定为 JSON 输出、关闭思考、temperature=0。R1 剩余方法仍在后台完成，R2 改动依据已发现的具体故障和代码问题，不使用尚未产生的评估结果。
+
 ## 方法启发
 
 [Google Cloud 博客](https://cloud.google.com/blog/products/data-analytics/more-than-100x-faster-and-cheaper-llm-powered-sql-queries-with-proxy-models) 和其 [SIGMOD 2026 论文](https://arxiv.org/abs/2603.15970) 提醒：proxy 的效果需要通过独立样本验证，不能只凭训练指标决定替代 LLM；极端类别不均衡与 embedding 质量会限制简单 proxy。后续改动会作为本项目的具体经验写入 prompt，不把论文中其他数据集的加速比例当作本项目结果。

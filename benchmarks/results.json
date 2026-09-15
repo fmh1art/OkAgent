@@ -131,5 +131,218 @@
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
     ]
+  },
+  {
+    "round": "r1",
+    "method": "baseline",
+    "job": "job01",
+    "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
+    "started_at": "2026-09-15T16:51:08Z",
+    "status": "running",
+    "label_attempts": 601,
+    "successful_labels": 600,
+    "positive_labels": 9,
+    "unfinished_or_failed_labels": 1,
+    "label_agreement_on_queried_sample": {
+      "n": 600,
+      "agree": 593,
+      "live_positive_gold_positive": 6,
+      "live_positive_gold_negative": 3,
+      "live_negative_gold_positive": 4
+    },
+    "label_tokens": {
+      "prompt_tokens": 4194063,
+      "completion_tokens": 269467,
+      "total_tokens": 4463530,
+      "cached_tokens": 1925960,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 7.971077392573158,
+      "median": 7.836967813782394,
+      "maximum": 12.831588389351964
+    },
+    "agent_calls": 5,
+    "agent_tokens": {
+      "prompt_tokens": 21332,
+      "completion_tokens": 3510,
+      "total_tokens": 24842,
+      "cached_tokens": 0,
+      "reasoning_tokens": 396
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r1",
+    "method": "hydra",
+    "job": "job01",
+    "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
+    "started_at": "2026-09-15T16:59:07Z",
+    "status": "running",
+    "label_attempts": 364,
+    "successful_labels": 355,
+    "positive_labels": 105,
+    "unfinished_or_failed_labels": 9,
+    "label_agreement_on_queried_sample": {
+      "n": 355,
+      "agree": 295,
+      "live_positive_gold_positive": 81,
+      "live_positive_gold_negative": 24,
+      "live_negative_gold_positive": 36
+    },
+    "label_tokens": {
+      "prompt_tokens": 2972062,
+      "completion_tokens": 175339,
+      "total_tokens": 3147401,
+      "cached_tokens": 1078168,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 8.94741692722074,
+      "median": 8.654352761805058,
+      "maximum": 64.6808472443372
+    },
+    "agent_calls": 0,
+    "agent_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_models": []
+  },
+  {
+    "round": "r1",
+    "method": "hydra_replay",
+    "job": "job01",
+    "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
+    "started_at": "2026-09-15T16:53:00Z",
+    "status": "complete",
+    "elapsed_seconds": 25.75460430048406,
+    "evaluation": {
+      "job": "job01",
+      "candidate_count": 34761,
+      "selected_count": 9162,
+      "evaluated_count": 34761,
+      "unknown_gold_count": 0,
+      "tp": 366,
+      "fp": 8796,
+      "fn": 16,
+      "tn": 25583,
+      "recall": 0.9581151832460733,
+      "precision": 0.03994760969220694,
+      "f1": 0.07669740150880135,
+      "llm_calls": 1431,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "agent_reported"
+    },
+    "label_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_calls": 0,
+    "agent_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_models": []
+  },
+  {
+    "round": "r1",
+    "method": "hydra_replay",
+    "job": "job04",
+    "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
+    "started_at": "2026-09-15T16:53:00Z",
+    "status": "complete",
+    "elapsed_seconds": 15.97816663235426,
+    "evaluation": {
+      "job": "job04",
+      "candidate_count": 18183,
+      "selected_count": 7740,
+      "evaluated_count": 18183,
+      "unknown_gold_count": 0,
+      "tp": 327,
+      "fp": 7413,
+      "fn": 1,
+      "tn": 10442,
+      "recall": 0.9969512195121951,
+      "precision": 0.04224806201550388,
+      "f1": 0.08106098165592464,
+      "llm_calls": 1525,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "agent_reported"
+    },
+    "label_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_calls": 0,
+    "agent_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_models": []
+  },
+  {
+    "round": "r1",
+    "method": "lo_ph",
+    "job": "job01",
+    "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
+    "started_at": "2026-09-15T16:51:08Z",
+    "status": "aborted_contract_failure",
+    "ended_at": "2026-09-15T17:02:57.336347+00:00",
+    "reason": "Repeated invalid result manifests across label/sample calls; stopped after planner changed samples without resolving schema failures.",
+    "elapsed_seconds": 709.336347,
+    "label_attempts": 250,
+    "successful_labels": 249,
+    "positive_labels": 5,
+    "unfinished_or_failed_labels": 1,
+    "label_agreement_on_queried_sample": {
+      "n": 249,
+      "agree": 246,
+      "live_positive_gold_positive": 3,
+      "live_positive_gold_negative": 2,
+      "live_negative_gold_positive": 1
+    },
+    "label_tokens": {
+      "prompt_tokens": 1736766,
+      "completion_tokens": 111384,
+      "total_tokens": 1848150,
+      "cached_tokens": 836616,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 8.018935534945992,
+      "median": 7.947206342592835,
+      "maximum": 10.979841148480773
+    },
+    "agent_calls": 56,
+    "agent_tokens": {
+      "prompt_tokens": 201755,
+      "completion_tokens": 18958,
+      "total_tokens": 220713,
+      "cached_tokens": 20504,
+      "reasoning_tokens": 7786
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
   }
 ]

@@ -221,3 +221,19 @@ def test_parallel_reservations_cannot_overrun_budget(run, llm):
     with pytest.raises(BudgetExceeded):
         op.label_many(list('abcdef'), workers=6)
     assert op.usage()['llm_calls'] == len(llm[0]) == 3
+
+
+def test_model_format_tolerance_and_failed_token_record(run, llm):
+    import sqlite3
+    llm[1].extend([
+        (200, '```json\n{"candidate_id":"a","is_match":{"result":true},"reason":"line one\nline two"}\n```'),
+        (200, '{bad JSON'),
+    ])
+    op = SemanticOperator(run / 'workspace')
+    assert op.label('a') == 1
+    with pytest.raises(ValueError):
+        op.label('b')
+    with sqlite3.connect(op.state) as con:
+        label, response = con.execute("SELECT label,response FROM queries WHERE candidate_id='b'").fetchone()
+    assert label is None and json.loads(response)['_usage']['total_tokens'] == 2
+    assert op.usage()['llm_calls'] == 2

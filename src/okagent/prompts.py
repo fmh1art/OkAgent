@@ -9,6 +9,18 @@ SYSTEM_PROMPT = """你是执行招聘筛选实验的 code agent。直接编写�
 完成实际运行并检查输出后，单独执行 echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT。
 """
 
+PROXY_SKILL = """## 稀少正例 proxy 实验要点
+- seed=42；先稳定排序 ID 再随机抽样，不从无序 set 采样。固定随机验证集约占预算 20%，与训练及主动采样始终互斥。
+- 训练先随机探索（约 400 人，随总预算缩放），单类时继续探索。之后分批增加训练样本：约 50% 高预测分、25% 分类边界、25% 随机，排除验证和已标注 ID。
+  高分部分用来补充稀少正例，随机部分避免只追逐模型已知模式；不要只在很低的召回阈值附近挑负例。有预算且验证仍不可靠时继续迭代。
+- 优先试 unstructured 的已有向量：L2 归一化 + class_weight='balanced' 的 L2 LogisticRegression（C=1）。聚类效果差不代表监督分类无效。
+  中文字符 TF-IDF（analyzer='char', max_features 有上限）可作对照；只用训练标签拟合。批量读库并缓存特征，避免对全库循环发数万次 SQL。
+- 每轮检查正例数和独立验证指标。阈值选满足 recall>=0.9 的最大值，不能选 PR 曲线第一个满足项：
+  p,r,t=precision_recall_curve(y_val,scores); eligible=np.flatnonzero(r[:-1]>=0.9); threshold=float(t[eligible[-1]])。
+  仅在验证含正例且 t 非空时使用；零正例不能估计 recall，少量正例需说明阈值不稳定。不要把调参集指标当作独立测试或统计保证。
+- 全库部署后用 cached_labels() 覆盖已查询标签。失败或未查询的标签不能填 0；重试需显式记录，仍计预算。保存每轮样本 ID、标签分布、阈值和验证指标。
+"""
+
 
 def build_prompt(workspace, job, count, config):
     requirements = "\n".join(f"- {item}" for item in job["must_have_qualifications"])
@@ -42,19 +54,8 @@ cached = op.get_label(ids[0])  # 仅查缓存；未查询过则 None
 
 ## 实验流程
 Partition、Sample、Label、Proxy、Deploy 仅表示以下代码阶段，无需实现额外规划 agent 或算子框架。
-1. 检查人数、分段和缺失值，固定 seed=42，以 candidate_id 划分数据，保留完整候选人集合。
-2. 先留出随机验证集并标注，约占预算 20%，不得参与训练或主动采样；剩余预算供训练和少量复核。
-   正例极少，验证集中若无正例，不能报告 recall；增加验证样本或明确写出无法估计，不能冒称达标。
-3. 训练从随机采样开始，必要时混合关键词召回样本；保留随机探索份额，记录各轮抽样方式。
-   简单结构化字段和 embedding 较弱，不依赖聚类或关键词硬排除；单类标签时先继续探索。
-4. 先实现简单 proxy：中文字符 TF-IDF + class_weight='balanced' 的 LogisticRegression，
-   可与已有向量特征比较。按候选人拆分，模型及拟合的特征变换不能接触验证标签。
-   用不确定样本/高预测分样本与随机样本混合增量标注，训练后验证；预算不足时停止采样。
-5. 在独立随机验证集上选择偏重 recall 的阈值（参考目标 0.9），报告 precision/recall、正负例数与不确定性。
-   阈值调优后的验证值不是独立测试结果；对偏置训练样本上的指标不要当作全库表现。
-6. 用冻结的模型与阈值分批预测全库；已查询的标签覆盖 proxy 判断。可用剩余预算复核边界样本。
-   覆盖时使用 cached_labels()，不要遍历全库调用 label()。字符 TF-IDF 必须显式设 analyzer='char'，限制 max_features。
-   不要漏掉缺失分段者；若预算耗尽仍为单类，采用明确记录的保守兜底，不能伪造二分类模型。
+检查人数、分段和缺失值，不漏掉缺失分段者，不用关键词硬排除。预算耗尽仍为单类时保存明确的保守兜底，不伪造二分类模型。
+{PROXY_SKILL}
 
 ## 输出
 保存 `pipeline.py`（重跑复用标签缓存），并实际执行。`output/` 内保存：

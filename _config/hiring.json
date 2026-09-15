@@ -1,0 +1,6 @@
+{
+  "raw_root": "../../hydra-hiring-agent/benchmarks/hiring/raw",
+  "job": "job01",
+  "as_of": "2026-07-22",
+  "max_calls": 2000
+}

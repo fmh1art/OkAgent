@@ -1,0 +1,56 @@
+import json
+
+import duckdb
+import pytest
+
+from okagent.data import prepare, write_json
+from okagent.evaluation import evaluate
+
+
+def output(run, ids, calls=2):
+    write_json(run / "workspace/output/candidate_ids.json", ids)
+    write_json(run / "workspace/output/usage.json", {"llm_calls": calls})
+
+
+def test_prepare_and_evaluate(run):
+    workspace = run / "workspace"
+    assert (workspace / "data.duckdb").is_symlink()
+    assert not list(workspace.glob("*llm_pass*"))
+    prompt = (workspace / "prompt.md").read_text()
+    assert all(name in prompt for name in ("Partition", "Sample", "Label", "Proxy", "Deploy"))
+    assert "最多 3 次" in prompt
+    output(run, ["a", "b"])
+    result = evaluate(run)
+    assert [result[key] for key in ("tp", "fp", "fn", "tn")] == [1, 1, 2, 2]
+    assert result["recall"] == pytest.approx(1 / 3)
+    assert result["precision"] == 0.5
+    assert result["within_budget"] is True
+    assert result["usage_source"] == "agent_reported"
+    assert json.loads((run / "evaluation.json").read_text()) == result
+
+
+@pytest.mark.parametrize("ids", [["a", "a"], ["unknown"], [123], {}])
+def test_invalid_ids(run, ids):
+    output(run, ids)
+    with pytest.raises(ValueError):
+        evaluate(run)
+
+
+def test_missing_labels_and_over_budget(run):
+    task = json.loads((run / "task.json").read_text())
+    with duckdb.connect(task["labels"]) as con:
+        con.execute("DELETE FROM llm_pass WHERE candidate_id='a'")
+    output(run, ["a"], calls=4)
+    result = evaluate(run)
+    assert result["evaluated_count"] == 5
+    assert result["unknown_gold_count"] == 1
+    assert result["recall"] == 0
+    assert result["precision"] is None
+    assert result["within_budget"] is False
+
+
+def test_missing_job_data_and_existing_run(source, run, tmp_path):
+    with pytest.raises(FileNotFoundError, match="job06"):
+        prepare(source, tmp_path / "missing", job="job06")
+    with pytest.raises(FileExistsError):
+        prepare(source, run)

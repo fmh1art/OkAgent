@@ -1,0 +1,83 @@
+"""Adapter to the existing OkAgent workspace; mock labels match the archive default."""
+import json
+from pathlib import Path
+
+import duckdb
+import numpy as np
+
+from .method import Config, run
+
+
+def load_vectors(database):
+    """Use one unstructured resume embedding per person, as the source benchmark does."""
+    with duckdb.connect(str(database), read_only=True) as con:
+        ids = [r[0] for r in con.execute(
+            "SELECT DISTINCT candidate_id FROM candidate_segments ORDER BY candidate_id").fetchall()]
+        positions = {cid: i for i, cid in enumerate(ids)}
+        cursor = con.execute("SELECT candidate_id,vec FROM candidate_segments WHERE segment='unstructured'")
+        seen, vectors = set(), None
+        while True:
+            rows = cursor.fetchmany(256)
+            if not rows:
+                break
+            for cid, vector in rows:
+                if cid in seen or vector is None:
+                    raise ValueError("Duplicate or missing unstructured embedding")
+                seen.add(cid)
+                if vectors is None:
+                    vectors = np.empty((len(ids), len(vector)), dtype=np.float32)
+                if len(vector) != vectors.shape[1]:
+                    raise ValueError("Inconsistent embedding dimensions")
+                vectors[positions[cid]] = vector
+    if set(ids) != seen or vectors is None:
+        raise ValueError("Every candidate needs an unstructured embedding; no candidates are silently dropped")
+    return ids, vectors
+
+
+def run_hiring(run_dir, query_vector=None, *, config=None, label=None, initialization=None):
+    """Write candidate_ids.json/usage.json for okagent.evaluation.evaluate().
+
+    label=None replays historical LLM labels, without any network requests.
+    For live labeling, supply label(ids)->[0/1,...], one request per callback;
+    the callback can read workspace/job.json and the requested resume texts.
+    """
+    run_dir = Path(run_dir)
+    task = json.loads((run_dir / "task.json").read_text(encoding="utf-8"))
+    config = config or Config(max_calls=task["max_calls"])
+    if config.max_calls > task["max_calls"]:
+        raise ValueError("Method max_calls cannot exceed the workspace budget")
+    ids, vectors = load_vectors(run_dir / "workspace/data.duckdb")
+    mode = "replay" if label is None else "live_callback"
+    if label is None:
+        # The full labels are confined to this oracle closure, never to ML features.
+        with duckdb.connect(task["labels"], read_only=True) as con:
+            rows = con.execute("SELECT candidate_id,llm_pass FROM llm_pass").fetchall()
+        truth = {}
+        universe = set(ids)
+        for cid, value in rows:
+            if cid not in universe:
+                continue
+            if cid in truth or type(value) is not int or value not in (0, 1):
+                raise ValueError("Replay requires one binary label per candidate")
+            truth[cid] = value
+        if set(truth) != universe:
+            raise ValueError("Replay labels do not cover the candidate pool")
+
+        def label(requested):
+            return [truth[cid] for cid in requested]
+
+    result = run(ids, vectors, label, query_vector, config=config, initialization=initialization)
+    output = run_dir / "workspace/output"
+    output.mkdir(exist_ok=True)
+    result["usage"].update(mode=mode)
+    result["summary"].update(mode=mode, candidate_count=len(ids), embedding_segment="unstructured")
+    payloads = {name: json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+                for name, value in (("candidate_ids.json", result["candidate_ids"]), ("usage.json", result["usage"]),
+                                    ("hydra_summary.json", result["summary"]))}
+    for filename, text in payloads.items():
+        (output / filename).write_text(text, encoding="utf-8")
+    # Small, inspectable numeric artifacts rather than a pickle tied to an internal package.
+    np.savez(output / "hydra_model.npz", parameters=(result["parameters"] if result["parameters"] is not None else []),
+             threshold=result["summary"]["threshold"],
+             constant_class=(int(result["scores"][0]) if result["parameters"] is None and len(ids) else -1))
+    return result

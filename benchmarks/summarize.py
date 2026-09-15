@@ -18,12 +18,16 @@ def summarize(run):
     path = run / 'workspace/output/semantic.sqlite'
     if path.exists():
         with sqlite3.connect(path) as con:
-            rows = con.execute('SELECT candidate_id,label,response FROM queries').fetchall()
+            rows = con.execute('SELECT candidate_id,label,response FROM queries ORDER BY call_id').fetchall()
         labeled = [(cid, label) for cid, label, _ in rows if label is not None]
         responses = [json.loads(response) for _, _, response in rows if response]
         result.update(label_attempts=len(rows), successful_labels=len(labeled),
                       positive_labels=sum(label for _, label in labeled),
                       unfinished_or_failed_labels=len(rows)-len(labeled))
+        initial = result.get('initial_calls', 0)
+        result['new_label_attempts'] = len(rows) - initial
+        result['new_label_tokens'] = tokens([json.loads(response).get('_usage', {})
+                                            for _, _, response in rows[initial:] if response])
         task = json.loads((run / 'task.json').read_text())
         with duckdb.connect(task['labels'], read_only=True) as con:
             gold = dict(con.execute('SELECT candidate_id,llm_pass FROM llm_pass').fetchall())
@@ -35,6 +39,7 @@ def summarize(run):
             live_negative_gold_positive=sum(a == 0 and b == 1 for a, b in pairs))
     latencies = [r['_latency_seconds'] for r in responses if '_latency_seconds' in r]
     result['label_tokens'] = tokens([r.get('_usage', {}) for r in responses])
+    result['label_models'] = sorted({r['_model'] for r in responses if r.get('_model')})
     if latencies:
         result['label_latency_seconds'] = dict(mean=mean(latencies), median=median(latencies), maximum=max(latencies))
     # Each trajectory contains its own agent calls; workers are separate from their planner.

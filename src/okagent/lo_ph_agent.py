@@ -53,6 +53,9 @@ Label 必须覆盖全部输入 ID；失败后可复用缓存补齐，不能把�
 def _context(workspace):
     job = (workspace / "job.json").read_text(encoding="utf-8")
     settings = (workspace / "settings.json").read_text(encoding="utf-8")
+    continuation = workspace / "continuation.json"
+    extra = ("\n这是同一预算内续跑；优先遵守下列原有划分和缓存，不重新划分：\n" +
+             continuation.read_text(encoding="utf-8")) if continuation.exists() else ""
     return f"""工作区：{workspace}；所有产物路径均相对此目录。
 岗位 job.json：{job}
 日期和总标注预算 settings.json：{settings}
@@ -64,7 +67,7 @@ op.usage() 返回 llm_calls/max_calls/remaining；失败计费、成功缓存复
 批量标注用 op.label_many(ids, workers=8)；op.cached_labels() 返回成功的 ID->标签字典；op.get_label(id) 只读缓存，无则 None。
 部署只用 cached_labels() 覆盖已查询标签，不要遍历全库调用 label()。先用小批检查脚本，再扩大；长任务保存阶段进度。
 匹配规则由 label_prompt.txt 指定；禁止读取工作区外的历史标签或评估结果。
-"""
+""" + extra
 
 
 class LogicalOperators:

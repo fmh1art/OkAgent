@@ -224,6 +224,8 @@ from okagent.semantic import SemanticOperator
 
 op = SemanticOperator(".")
 label = op.label("实际候选人ID")  # 返回 int 0/1
+labels = op.label_many(ids, workers=8)  # 并发的独立单人请求，按输入顺序返回
+cache = op.cached_labels()  # 只读取成功标签，不发请求；get_label(id) 返回标签或 None
 print(op.usage())                # llm_calls、max_calls、remaining
 ```
 
@@ -233,6 +235,8 @@ print(op.usage())                # llm_calls、max_calls、remaining
 
 - **一人一次请求**；批量处理使用 Python 循环，无法用一条请求标注多人。
 - 成功标签缓存在 `output/semantic.sqlite`，重复查询直接返回；多个脚本共用计数与缓存。
+- 每个 ID 单独去重，预算预留时短暂加全局锁；独立候选人的网络请求可并发。失败占预算且不自动重试。
+- `_config/llm.json` 可用 `label_kwargs` 设置标注请求参数；示例关闭豆包深度思考并设 temperature=0，不影响 code agent 的模型参数。
 - 请求前持久化计数，失败、超时和非法 JSON 都占一次预算，不自动重试；再次显式调用失败 ID 会再计一次。
 - 预算耗尽抛出 `BudgetExceeded`，成功缓存仍可读取。不要修改缓存或在同一工作区更换岗位、模型和规则。
 - `output/usage.json` 自动更新；评估直接从 SQLite 请求记录读取次数，`usage_source="semantic_operator"`。

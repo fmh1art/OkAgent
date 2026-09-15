@@ -216,3 +216,18 @@ def test_hiring_adapter_writes_existing_evaluation_contract(tmp_path):
     assert report["recall"] == report["precision"] == 1
     assert report["llm_calls"] == 8
     assert (run_dir / "workspace/output/hydra_model.npz").is_file()
+
+
+def test_concurrent_callbacks_preserve_algorithm():
+    rng = np.random.default_rng(42)
+    x = rng.normal(size=(80, 5))
+    truth = (x[:, 0] > 0).astype(int)
+    options = dict(sample_size=32, calibration_sample_size=16, step=8, adaptive=False)
+    def label(ids):
+        return truth[list(map(int, ids))]
+    a = run(list(map(str, range(80))), x, label, config=Config(**options))
+    b = run(list(map(str, range(80))), x, label, config=Config(**options, label_workers=4))
+    assert a['candidate_ids'] == b['candidate_ids']
+    assert a['usage'] == b['usage']
+    assert a['summary']['training_indices'] == b['summary']['training_indices']
+    assert np.array_equal(a['scores'], b['scores'])

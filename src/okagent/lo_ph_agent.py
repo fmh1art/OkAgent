@@ -18,7 +18,7 @@ from .semantic import SemanticOperator
 CONTRACTS = {
     "partition": "输入 table；按指定方法分区。返回各分区的 ID 数组 JSON，分区互斥且并集等于输入，artifacts 的键为分区名。",
     "sample": "输入 table，可选 exclude；返回 artifacts.table（ID 数组 JSON）。去重、属于输入、与 exclude 不相交，检查数量和随机种子。",
-    "label": "输入 table；逐人调用 SemanticOperator('.').label(id)。返回 artifacts.table（JSON 行数组，每行 candidate_id 和整数 label=0/1），覆盖输入 ID。",
+    "label": "输入 table；用 SemanticOperator('.').label_many(ids, workers=8) 发出独立逐人请求。返回 artifacts.table（JSON 行数组，每行 candidate_id 和整数 label=0/1），覆盖输入 ID。",
     "proxy": "输入 train，可选 validation；仅用 train 拟合特征和模型，处理不均衡、单类及泄漏。返回 artifacts.model（pickle，含拟合的特征变换和模型）。",
     "deploy": "输入 table、model，可选 validation；按指定方法选择阈值并预测完整输入，缓存的真实标签覆盖预测。返回 artifacts.candidate_ids（去重的匹配 ID 数组 JSON）和验证说明。",
 }
@@ -55,6 +55,8 @@ data.duckdb 是只读简历库，candidate_segments(candidate_id, segment, text,
 用 duckdb.connect('data.duckdb', read_only=True) 查询。已有 embedding 粗糙，正例极少，优先 recall，兼顾 precision。
 仅通过 from okagent.semantic import SemanticOperator 获取 LLM 标签；op=SemanticOperator('.')，op.label(id) 返回 0/1。
 op.usage() 返回 llm_calls/max_calls/remaining；失败计费、成功缓存复用，所有算子共用预算。
+批量标注用 op.label_many(ids, workers=8)；op.cached_labels() 返回成功的 ID->标签字典；op.get_label(id) 只读缓存，无则 None。
+部署只用 cached_labels() 覆盖已查询标签，不要遍历全库调用 label()。先用小批检查脚本，再扩大；长任务保存阶段进度。
 匹配规则由 label_prompt.txt 指定；禁止读取工作区外的历史标签或评估结果。
 """
 

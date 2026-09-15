@@ -1,0 +1,135 @@
+[
+  {
+    "round": "r0",
+    "method": "baseline",
+    "job": "job01",
+    "source_commit": "1d127489b4504c4449c6d6af76f96149d42eda59",
+    "started_at": "2026-09-15T16:39:48Z",
+    "status": "aborted_preflight",
+    "ended_at": "2026-09-15T16:47:05.329755+00:00",
+    "reason": "Serial network lock and unsupported generated cache API; stopped for infrastructure fixes before full evaluation.",
+    "elapsed_seconds": 437.329755,
+    "label_attempts": 11,
+    "successful_labels": 10,
+    "positive_labels": 0,
+    "unfinished_or_failed_labels": 1,
+    "label_agreement_on_queried_sample": {
+      "n": 10,
+      "agree": 10,
+      "live_positive_gold_positive": 0,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 0
+    },
+    "label_tokens": {
+      "prompt_tokens": 71245,
+      "completion_tokens": 16696,
+      "total_tokens": 87941,
+      "cached_tokens": 3896,
+      "reasoning_tokens": 11957
+    },
+    "label_latency_seconds": {
+      "mean": 28.335220294073224,
+      "median": 28.162081939168274,
+      "maximum": 35.00485048815608
+    },
+    "agent_calls": 8,
+    "agent_tokens": {
+      "prompt_tokens": 30576,
+      "completion_tokens": 7275,
+      "total_tokens": 37851,
+      "cached_tokens": 0,
+      "reasoning_tokens": 261
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r0",
+    "method": "hydra",
+    "job": "job01",
+    "source_commit": "1d127489b4504c4449c6d6af76f96149d42eda59",
+    "started_at": "2026-09-15T16:39:48Z",
+    "status": "aborted_preflight",
+    "ended_at": "2026-09-15T16:47:05.329862+00:00",
+    "reason": "Serial network lock and unsupported generated cache API; stopped for infrastructure fixes before full evaluation.",
+    "elapsed_seconds": 437.329862,
+    "label_attempts": 15,
+    "successful_labels": 14,
+    "positive_labels": 1,
+    "unfinished_or_failed_labels": 1,
+    "label_agreement_on_queried_sample": {
+      "n": 14,
+      "agree": 14,
+      "live_positive_gold_positive": 1,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 0
+    },
+    "label_tokens": {
+      "prompt_tokens": 106373,
+      "completion_tokens": 23026,
+      "total_tokens": 129399,
+      "cached_tokens": 0,
+      "reasoning_tokens": 16534
+    },
+    "label_latency_seconds": {
+      "mean": 29.05177022556641,
+      "median": 28.643624126911163,
+      "maximum": 35.87984507530928
+    },
+    "agent_calls": 0,
+    "agent_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_models": []
+  },
+  {
+    "round": "r0",
+    "method": "lo_ph",
+    "job": "job01",
+    "source_commit": "1d127489b4504c4449c6d6af76f96149d42eda59",
+    "started_at": "2026-09-15T16:39:48Z",
+    "status": "aborted_preflight",
+    "ended_at": "2026-09-15T16:47:05.329449+00:00",
+    "reason": "Serial network lock and unsupported generated cache API; stopped for infrastructure fixes before full evaluation.",
+    "elapsed_seconds": 437.329449,
+    "label_attempts": 13,
+    "successful_labels": 12,
+    "positive_labels": 0,
+    "unfinished_or_failed_labels": 1,
+    "label_agreement_on_queried_sample": {
+      "n": 12,
+      "agree": 12,
+      "live_positive_gold_positive": 0,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 0
+    },
+    "label_tokens": {
+      "prompt_tokens": 88506,
+      "completion_tokens": 18877,
+      "total_tokens": 107383,
+      "cached_tokens": 14048,
+      "reasoning_tokens": 13316
+    },
+    "label_latency_seconds": {
+      "mean": 27.2588502758493,
+      "median": 26.514826081693172,
+      "maximum": 32.68986285477877
+    },
+    "agent_calls": 10,
+    "agent_tokens": {
+      "prompt_tokens": 36902,
+      "completion_tokens": 3252,
+      "total_tokens": 40154,
+      "cached_tokens": 4720,
+      "reasoning_tokens": 1373
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  }
+]

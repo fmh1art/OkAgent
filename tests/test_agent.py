@@ -189,3 +189,35 @@ def test_submission_without_training_artifacts_is_incomplete(run):
     with pytest.raises(FileNotFoundError, match="pipeline.py"):
         run_agent(run, model=model)
     assert not (run / "evaluation.json").exists()
+
+
+def test_independent_queries_overlap_and_keep_budget(run, llm):
+    from threading import Barrier
+    gate = Barrier(3)
+
+    def response(body):
+        cid = re.search(r'ID: ([a-f])', body['messages'][-1]['content'])[1]
+        gate.wait(timeout=10)  # Would deadlock if the network request still held the global lock.
+        return judgment(cid, cid == 'a')[1]
+
+    llm[1].extend([(200, response)] * 3)
+    op = SemanticOperator(run / 'workspace')
+    assert op.label_many(['a', 'b', 'c'], workers=3) == [1, 0, 0]
+    assert op.cached_labels() == {'a': 1, 'b': 0, 'c': 0}
+    assert op.get_label('d') is None
+    assert op.usage()['llm_calls'] == len(llm[0]) == 3
+    with pytest.raises(BudgetExceeded):
+        op.label_many(['d', 'e'], workers=2)
+    assert len(llm[0]) == 3
+
+
+def test_parallel_reservations_cannot_overrun_budget(run, llm):
+    def response(body):
+        cid = re.search(r'ID: ([a-f])', body['messages'][-1]['content'])[1]
+        return judgment(cid, 0)[1]
+
+    llm[1].extend([(200, response)] * 3)
+    op = SemanticOperator(run / 'workspace')
+    with pytest.raises(BudgetExceeded):
+        op.label_many(list('abcdef'), workers=6)
+    assert op.usage()['llm_calls'] == len(llm[0]) == 3

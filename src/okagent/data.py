@@ -18,7 +18,8 @@ def llm_config():
     config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     return dict(model=config.get("llm_name"),
                 base_url=os.environ.get("OKAGENT_API_BASE") or config.get("openai_base_url"),
-                api_key=os.environ.get("OPENAI_API_KEY") or config.get("key"))
+                api_key=os.environ.get("OPENAI_API_KEY") or config.get("key"),
+                label_kwargs=config.get("label_kwargs", {}))
 
 
 def prepare(config_path, run_dir, job=None):

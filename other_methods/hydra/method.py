@@ -1,5 +1,7 @@
 """Standalone reproduction of the archive's configured ML/active-learning path."""
 from dataclasses import asdict, dataclass
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 
 import numpy as np
 from scipy.optimize import minimize
@@ -24,10 +26,11 @@ class Config:
     patience: int = 3
     max_calls: int = 2000
     batch_size: int = 1
+    label_workers: int = 1
     seed: int = 42
 
     def validate(self):
-        for name in ("sample_size", "step", "patience", "max_calls", "batch_size"):
+        for name in ("sample_size", "step", "patience", "max_calls", "batch_size", "label_workers"):
             if type(getattr(self, name)) is not int or getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be a positive integer")
         if type(self.calibration_sample_size) is not int or self.calibration_sample_size < 0:
@@ -130,14 +133,15 @@ def run(candidate_ids, vectors, label, query_vector=None, *, config=None, initia
     n = len(ids)
     cache = np.full(n, -1, dtype=np.int8)
     usage = dict(llm_calls=0, labeled_candidates=0)
+    usage_lock = Lock()
 
     def acquire(indices):
         pending = list(dict.fromkeys(int(i) for i in indices if cache[i] < 0))
-        for start in range(0, len(pending), config.batch_size):
-            batch = pending[start:start + config.batch_size]
-            if usage["llm_calls"] >= config.max_calls:
-                raise RuntimeError("LLM call budget exhausted")
-            usage["llm_calls"] += 1  # Failed requests are charged; no automatic retries.
+        def query(batch):
+            with usage_lock:
+                if usage["llm_calls"] >= config.max_calls:
+                    raise RuntimeError("LLM call budget exhausted")
+                usage["llm_calls"] += 1  # Failed requests are charged; no automatic retries.
             try:
                 answer = np.asarray(label([ids[i] for i in batch]))
                 if answer.shape != (len(batch),) or answer.dtype.kind not in "biu" or not np.isin(answer, [0, 1]).all():
@@ -145,7 +149,16 @@ def run(candidate_ids, vectors, label, query_vector=None, *, config=None, initia
             except Exception as error:
                 raise RuntimeError(f"Labeling failed after {usage['llm_calls']} charged requests") from error
             cache[batch] = answer
-            usage["labeled_candidates"] += len(batch)
+            with usage_lock:
+                usage["labeled_candidates"] += len(batch)
+
+        batches = [pending[start:start + config.batch_size] for start in range(0, len(pending), config.batch_size)]
+        if config.label_workers == 1:
+            for batch in batches:
+                query(batch)
+        else:
+            with ThreadPoolExecutor(max_workers=config.label_workers) as pool:
+                list(pool.map(query, batches))
 
     limit = min(config.sample_size, n)
     stop_size = min(n, int(np.ceil(config.stop_fraction * n))) if config.adaptive else 0

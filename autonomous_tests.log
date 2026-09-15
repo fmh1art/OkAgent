@@ -1,0 +1,85 @@
+test_code_fence_compatibility (test_operator_agent.OperatorAgentTest.test_code_fence_compatibility) ... ok
+test_demo_profile_unchanged (test_operator_agent.OperatorAgentTest.test_demo_profile_unchanged) ... ok
+test_done_and_network_validation (test_operator_agent.OperatorAgentTest.test_done_and_network_validation) ... ok
+test_one_wrapper_and_aliases (test_operator_agent.OperatorAgentTest.test_one_wrapper_and_aliases) ... ok
+test_operator_parameters_must_be_object (test_operator_agent.OperatorAgentTest.test_operator_parameters_must_be_object) ... ok
+[Round 1] Planner
+[Round 1] TryDifferentProxy {"trial": 0}
+[Round 1] ok: {"status": "ok", "quality": 1}
+[Round 2] Planner
+[Round 2] TryDifferentProxy {"trial": 1}
+[Round 2] ok: {"status": "ok", "quality": 2}
+[Round 3] Planner
+[Round 3] TryDifferentProxy {"trial": 2}
+[Round 3] ok: {"status": "ok", "quality": 3}
+[Round 4] Planner
+[Round 4] TryDifferentProxy {"trial": 3}
+[Round 4] ok: {"status": "ok", "quality": 4}
+[Round 5] Planner
+[Round 5] TryDifferentProxy {"trial": 4}
+[Round 5] ok: {"status": "ok", "quality": 5}
+[Round 6] Planner
+[Round 6] TryDifferentProxy {"trial": 5}
+[Round 6] ok: {"status": "ok", "quality": 6}
+[Round 7] Planner
+[Round 7] TryDifferentProxy {"trial": 6}
+[Round 7] ok: {"status": "ok", "quality": 7}
+[Round 8] Planner
+[Round 8] TryDifferentProxy {"trial": 7}
+[Round 8] ok: {"status": "ok", "quality": 8}
+[Round 9] Planner
+[Round 9] TryDifferentProxy {"trial": 8}
+[Round 9] ok: {"status": "ok", "quality": 9}
+[Round 10] Planner
+[Round 10] TryDifferentProxy {"trial": 9}
+[Round 10] ok: {"status": "ok", "quality": 10}
+[Round 11] Planner
+[Round 11] TryDifferentProxy {"trial": 10}
+[Round 11] ok: {"status": "ok", "quality": 11}
+[Round 12] Planner
+[Round 12] TryDifferentProxy {"trial": 11}
+[Round 12] ok: {"status": "ok", "quality": 12}
+[Round 13] Planner
+[Round 13] TryDifferentProxy {"trial": 12}
+[Round 13] ok: {"status": "ok", "quality": 13}
+[Round 14] Planner
+[Round 14] TryDifferentProxy {"trial": 13}
+[Round 14] ok: {"status": "ok", "quality": 14}
+[Round 15] Planner
+[Round 15] TryDifferentProxy {"trial": 14}
+[Round 15] ok: {"status": "ok", "quality": 15}
+[Round 16] Planner
+[Round 16] TryDifferentProxy {"trial": 15}
+[Round 16] ok: {"status": "ok", "quality": 16}
+[Round 17] Planner
+[Round 17] done: {"status": "ok", "summary": "finished after observing round 16"}
+test_custom_repeated_operators_beyond_twelve_and_feedback (test_react_runtime.LoopTest.test_custom_repeated_operators_beyond_twelve_and_feedback) ... ok
+[Round 1] Planner
+[Round 1] Proxy {}
+[Round 1] error: {"status": "error", "stage": "execute", "error": "Code exit=1: Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"<frozen runpy>\", line 287, in run_path\n  File \"<frozen runpy>\", line 98, in _run_module_code\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"C:\\Users\\86131\\AppData\\Local\\Temp\\tmp_1r0xqzd\\rounds\\000001\\code.py\", line 2, in <module>\n    raise ValueError(\"fit failed\")\nValueError: fit failed\n"}
+[Round 2] Planner
+[Round 2] Proxy {}
+[Round 2] ok: {"status": "ok"}
+[Round 3] Planner
+[Round 3] done: {"status": "ok", "summary": "ok"}
+test_failure_is_given_to_planner_and_same_operator_runs_again (test_react_runtime.LoopTest.test_failure_is_given_to_planner_and_same_operator_runs_again) ... ok
+[Round 1] Planner
+[Round 2] Planner
+[Round 2] done: {"status": "ok", "summary": "resumed"}
+test_interrupted_round_resumes_with_new_number (test_react_runtime.LoopTest.test_interrupted_round_resumes_with_new_number) ... ok
+test_list_of_operators_is_rejected (test_react_runtime.LoopTest.test_list_of_operators_is_rejected) ... ok
+test_python_boolean_compatibility (test_react_runtime.LoopTest.test_python_boolean_compatibility) ... ok
+test_custom_model_and_threshold_independent_validation (test_job01_full.FullEvaluationTest.test_custom_model_and_threshold_independent_validation) ... ok
+[Round 1] Planner
+[Round 1] TrainBaseline {}
+[Round 1] ok: {"status": "ok", "model_file": "C:\\Users\\86131\\AppData\\Local\\Temp\\tmpqo4cupk7\\run\\rounds\\000001\\validated_model.joblib", "model_class": "Pipeline", "threshold": 0.5, "validation": {"rows": 7, "positive": 4, "threshold": 0.5, "precision": 0.8, "recall": 1.0, "f1": 0.8888888888888888, "average_precision": 0.8875, "roc_auc": 0.8333333333333334, "tp": 4, "fp": 1, "fn": 0, "tn": 2}, "model_sha256": "e5e5cfa62299fcc0f220ba6dbb177577ef5f5a218bc665160f68576fff0960e6", "message": "Validation metrics independently recomputed; final test not accessed."}
+[Round 2] Planner
+[Round 2] done: {"status": "ok", "summary": "Offline smoke complete"}
+test_full_chain_and_resume (test_job01_full.FullEvaluationTest.test_full_chain_and_resume) ... ok
+test_missing_vector_and_duplicate_label_fail (test_job01_full.FullEvaluationTest.test_missing_vector_and_duplicate_label_fail) ... ok
+test_rejects_leaked_model_and_changed_settings (test_job01_full.FullEvaluationTest.test_rejects_leaked_model_and_changed_settings) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 10.026s
+
+OK

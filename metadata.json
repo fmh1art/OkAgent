@@ -1,0 +1,63 @@
+{
+  "dataset_kind": "real_row_subset_demo",
+  "job": "job01",
+  "source_snapshot_name": "job-candidate-embedding-20260722",
+  "sampling": {
+    "method": "deterministic_sha256_order_with_source_prevalence",
+    "seed": 20260903,
+    "positive_count": 33,
+    "negative_count": 2967,
+    "train_ratio": 0.8,
+    "source_label_counts": {
+      "0": 34379,
+      "1": 382
+    },
+    "source_positive_rate": 0.010989327119472973,
+    "sample_positive_rate": 0.011,
+    "note": "Source prevalence preserved to the nearest possible integer count."
+  },
+  "counts": {
+    "full": 3000,
+    "train": 2400,
+    "test": 600,
+    "positive": 33,
+    "negative": 2967
+  },
+  "split_label_counts": {
+    "train": {
+      "0": 2374,
+      "1": 26
+    },
+    "test": {
+      "0": 593,
+      "1": 7
+    }
+  },
+  "segment_counts": {
+    "applications": 3000,
+    "awards": 1929,
+    "basic_info": 3000,
+    "education": 3000,
+    "languages": 1803,
+    "notes": 841,
+    "projects": 2272,
+    "unstructured": 3000,
+    "work": 1906
+  },
+  "embedding_dimension": 2048,
+  "content_policy": {
+    "candidate_values_modified": false,
+    "operations": [
+      "row_subsetting",
+      "serialization",
+      "stratified_split"
+    ],
+    "contains_real_personal_data": true,
+    "contains_credentials": false
+  },
+  "format": {
+    "candidate_files": "JSONL",
+    "embedding_files": "Parquet",
+    "embedding_join_key": "embedding_id"
+  }
+}

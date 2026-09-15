@@ -21,7 +21,7 @@ def make_model():
     if config["api_key"]:
         os.environ.setdefault("OPENAI_API_KEY", config["api_key"])
     return LitellmModel(model_name=name, cost_tracking="ignore_errors",
-                        model_kwargs={"api_base": config["base_url"], "timeout": 120})
+                        model_kwargs={"api_base": config["base_url"], "timeout": 120, "max_tokens": 8192})
 
 
 def make_environment(workspace, command_timeout=1800):

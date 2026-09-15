@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import litellm
+import duckdb
 from minisweagent.agents.default import DefaultAgent
 from minisweagent.exceptions import FormatError, Submitted
 from minisweagent.models.litellm_model import LitellmModel
@@ -43,6 +44,7 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 复用当前 workspace 的已有输入和 SemanticOperator 预算/缓存，不修改输入文件和其他算子的产物。
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
 result.json 的 summary 必须为字符串；统计对象另存文件。table.json 必须用 json.dump(rows, f) 保存一个 JSON 数组，禁止 JSONL。
+Label 必须覆盖全部输入 ID；失败后可复用缓存补齐，不能把部分标注表当作成功结果。无法补齐时明确失败。
 提交前实际 json.load 所有 JSON 产物，assert isinstance(result['summary'], str)，检查输入 ID 和输出 ID 完全一致（采样/部署按各自契约）。
 遇到不成立的前提或预算不足，应报告失败，不能伪造标签、指标或空产物宣称成功。
 """
@@ -126,6 +128,21 @@ class LogicalOperators:
                     json.loads(path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError as error:
                     raise ValueError(f"{name}: write one JSON value with json.dump, not JSONL") from error
+        if operator == "label":
+            if inputs["table"] == "data.duckdb":
+                with duckdb.connect(str(self.workspace / "data.duckdb"), read_only=True) as con:
+                    wanted = {r[0] for r in con.execute("SELECT DISTINCT candidate_id FROM candidate_segments").fetchall()}
+            else:
+                source = json.loads(self._path(inputs["table"]).read_text(encoding="utf-8"))
+                wanted = {r["candidate_id"] if isinstance(r, dict) else r for r in source}
+            rows = json.loads(self._path(artifacts["table"]).read_text(encoding="utf-8"))
+            if not isinstance(rows, list) or any(not isinstance(r, dict) or not isinstance(r.get("candidate_id"), str)
+                    or type(r.get("label")) is not int or r["label"] not in (0, 1) for r in rows):
+                raise ValueError("label output must be an array of candidate_id and integer label=0/1 rows")
+            cache = self.semantic.cached_labels()
+            if (len(rows) != len(wanted) or {r["candidate_id"] for r in rows} != wanted
+                    or any(cache.get(r["candidate_id"]) != r["label"] for r in rows)):
+                raise ValueError("label must cover every input ID once using successful SemanticOperator labels; fill missing labels before submitting")
         result = dict(operator=operator, artifacts=artifacts, summary=result["summary"],
                       usage=self.semantic.usage(), trajectory=f"{relative}/trajectory.json")
         self.completed.append(result)

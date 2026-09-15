@@ -10,8 +10,38 @@
     },
     "temperature": 0,
     "response_format": {
-      "type": "json_object"
-    }
+      "type": "json_schema",
+      "json_schema": {
+        "name": "hiring_label",
+        "strict": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "candidate_id": {
+              "type": "string"
+            },
+            "is_match": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "candidate_id",
+            "is_match"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "max_tokens": 256
   },
   "label_interval": 0.65
 }

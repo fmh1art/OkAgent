@@ -136,3 +136,25 @@ def test_local_configuration_and_secret_not_serialized(tmp_path, monkeypatch):
     assert model.config.model_name == "openai/example-endpoint"
     assert model.config.model_kwargs["api_base"] == "http://localhost/v1"
     assert "config-test-key" not in json.dumps(model.serialize())
+
+
+def test_label_cannot_submit_partial_or_invented_results(run, monkeypatch):
+    import okagent.lo_ph_agent as module
+    workspace = run / 'workspace'
+    write_json(workspace / 'input.json', ['a', 'b'])
+
+    class PartialAgent:
+        def __init__(self, model, env, **kwargs):
+            self.directory = kwargs['output_path'].parent
+        def run(self, task):
+            (self.directory / 'implementation.py').write_text('# Deliberately incomplete test artifact')
+            write_json(self.directory / 'table.json', [{'candidate_id': 'a', 'label': 0}])
+            write_json(self.directory / 'result.json', {'artifacts': {
+                'table': str((self.directory / 'table.json').relative_to(workspace))}, 'summary': 'Incomplete'})
+            return {'exit_status': 'Submitted'}
+
+    monkeypatch.setattr(module, 'DefaultAgent', PartialAgent)
+    ops = LogicalOperators(workspace, model_factory=lambda: None)
+    with pytest.raises(ValueError, match='cover every input ID'):
+        ops.label({'table': 'input.json'}, 'Label both IDs')
+    assert not ops.completed

@@ -39,15 +39,17 @@ def summarize(run):
         result['label_latency_seconds'] = dict(mean=mean(latencies), median=median(latencies), maximum=max(latencies))
     # Each trajectory contains its own agent calls; workers are separate from their planner.
     trajectories = list(run.glob('*.trajectory.json')) + list(run.glob('workspace/operators/*/trajectory.json'))
-    usages, models = [], set()
+    usages, models, calls = [], set(), 0
     for path in trajectories:
         trajectory = json.loads(path.read_text())
+        calls += trajectory['info'].get('model_stats', {}).get('api_calls', 0)
         for message in trajectory['messages']:
             response = message.get('extra', {}).get('response', {})
             if message['role'] == 'assistant' and response:
                 usages.append(response.get('usage', {}))
                 models.add(response.get('model', 'unknown'))
-    result['agent_calls'] = len(usages)
+    result['agent_calls'] = calls
+    result['agent_calls_with_recorded_usage'] = len(usages)
     result['agent_tokens'] = tokens(usages)
     result['agent_models'] = sorted(models)
     return result

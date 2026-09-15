@@ -12,5 +12,6 @@
     "response_format": {
       "type": "json_object"
     }
-  }
+  },
+  "label_interval": 0.65
 }

@@ -237,3 +237,18 @@ def test_model_format_tolerance_and_failed_token_record(run, llm):
         label, response = con.execute("SELECT label,response FROM queries WHERE candidate_id='b'").fetchone()
     assert label is None and json.loads(response)['_usage']['total_tokens'] == 2
     assert op.usage()['llm_calls'] == 2
+
+
+def test_optional_endpoint_pacing_applies_to_parallel_requests(run, llm, monkeypatch, tmp_path):
+    import time
+    config = tmp_path / 'paced.json'
+    write_json(config, {'label_interval': 0.12})
+    monkeypatch.setenv('OKAGENT_LLM_CONFIG', str(config))
+    arrivals = []
+    def response(body):
+        arrivals.append(time.monotonic())
+        cid = re.search(r'ID: ([a-f])', body['messages'][-1]['content'])[1]
+        return judgment(cid, 0)[1]
+    llm[1].extend([(200, response)] * 3)
+    assert SemanticOperator(run / 'workspace').label_many(list('abc'), workers=3) == [0, 0, 0]
+    assert max(arrivals) - min(arrivals) >= 0.18

@@ -19,7 +19,8 @@ def llm_config():
     return dict(model=config.get("llm_name"),
                 base_url=os.environ.get("OKAGENT_API_BASE") or config.get("openai_base_url"),
                 api_key=os.environ.get("OPENAI_API_KEY") or config.get("key"),
-                label_kwargs=config.get("label_kwargs", {}))
+                label_kwargs=config.get("label_kwargs", {}),
+                label_interval=float(config.get("label_interval", 0)))
 
 
 def prepare(config_path, run_dir, job=None):

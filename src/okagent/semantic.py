@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import time
+import tempfile
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -71,6 +72,19 @@ class SemanticOperator:
             if not model:
                 raise ValueError("Set OKAGENT_LABEL_MODEL before labeling")
             with OpenAI(api_key=config["api_key"], base_url=config["base_url"], max_retries=0, timeout=120) as client:
+                # Optional pacing is shared across workspaces using the same endpoint.
+                interval = config["label_interval"]
+                if interval > 0:
+                    endpoint = hashlib.sha256(f"{config['base_url']}/{model}".encode()).hexdigest()
+                    rate_file = Path(tempfile.gettempdir()) / f"okagent-{os.getuid()}-{endpoint}.rate"
+                    with rate_file.open("a+") as rate_lock:
+                        fcntl.flock(rate_lock, fcntl.LOCK_EX)
+                        rate_lock.seek(0)
+                        previous = float(rate_lock.read() or 0)
+                        time.sleep(max(0, previous + interval - time.monotonic()))
+                        rate_lock.seek(0)
+                        rate_lock.truncate()
+                        rate_lock.write(str(time.monotonic()))
                 with (self.output / "semantic.lock").open("a") as budget_lock:
                     fcntl.flock(budget_lock, fcntl.LOCK_EX)
                     if self.usage()["remaining"] == 0:

@@ -139,36 +139,36 @@
     "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
     "started_at": "2026-09-15T16:51:08Z",
     "status": "running",
-    "label_attempts": 601,
-    "successful_labels": 600,
-    "positive_labels": 9,
-    "unfinished_or_failed_labels": 1,
+    "label_attempts": 800,
+    "successful_labels": 778,
+    "positive_labels": 10,
+    "unfinished_or_failed_labels": 22,
     "label_agreement_on_queried_sample": {
-      "n": 600,
-      "agree": 593,
+      "n": 778,
+      "agree": 770,
       "live_positive_gold_positive": 6,
-      "live_positive_gold_negative": 3,
+      "live_positive_gold_negative": 4,
       "live_negative_gold_positive": 4
     },
     "label_tokens": {
-      "prompt_tokens": 4194063,
-      "completion_tokens": 269467,
-      "total_tokens": 4463530,
-      "cached_tokens": 1925960,
+      "prompt_tokens": 5367569,
+      "completion_tokens": 349360,
+      "total_tokens": 5716929,
+      "cached_tokens": 2483088,
       "reasoning_tokens": 0
     },
     "label_latency_seconds": {
-      "mean": 7.971077392573158,
-      "median": 7.836967813782394,
+      "mean": 7.997895044605792,
+      "median": 7.860523676499724,
       "maximum": 12.831588389351964
     },
-    "agent_calls": 5,
+    "agent_calls": 8,
     "agent_tokens": {
-      "prompt_tokens": 21332,
-      "completion_tokens": 3510,
-      "total_tokens": 24842,
+      "prompt_tokens": 57412,
+      "completion_tokens": 7822,
+      "total_tokens": 65234,
       "cached_tokens": 0,
-      "reasoning_tokens": 396
+      "reasoning_tokens": 665
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -178,30 +178,30 @@
     "round": "r1",
     "method": "hydra",
     "job": "job01",
-    "source_commit": "73d80da62cedee7ac22ad54b756fbcc14ac144a0",
-    "started_at": "2026-09-15T16:59:07Z",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:12:42Z",
     "status": "running",
-    "label_attempts": 364,
-    "successful_labels": 355,
-    "positive_labels": 105,
-    "unfinished_or_failed_labels": 9,
+    "label_attempts": 574,
+    "successful_labels": 551,
+    "positive_labels": 146,
+    "unfinished_or_failed_labels": 23,
     "label_agreement_on_queried_sample": {
-      "n": 355,
-      "agree": 295,
-      "live_positive_gold_positive": 81,
-      "live_positive_gold_negative": 24,
-      "live_negative_gold_positive": 36
+      "n": 551,
+      "agree": 455,
+      "live_positive_gold_positive": 102,
+      "live_positive_gold_negative": 44,
+      "live_negative_gold_positive": 52
     },
     "label_tokens": {
-      "prompt_tokens": 2972062,
-      "completion_tokens": 175339,
-      "total_tokens": 3147401,
-      "cached_tokens": 1078168,
+      "prompt_tokens": 4647259,
+      "completion_tokens": 272632,
+      "total_tokens": 4919891,
+      "cached_tokens": 1701528,
       "reasoning_tokens": 0
     },
     "label_latency_seconds": {
-      "mean": 8.94741692722074,
-      "median": 8.654352761805058,
+      "mean": 9.089657911416683,
+      "median": 8.873708284460008,
       "maximum": 64.6808472443372
     },
     "agent_calls": 0,
@@ -340,6 +340,254 @@
       "total_tokens": 220713,
       "cached_tokens": 20504,
       "reasoning_tokens": 7786
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r2",
+    "method": "baseline",
+    "job": "job01",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:04:41Z",
+    "status": "running",
+    "label_attempts": 271,
+    "successful_labels": 202,
+    "positive_labels": 4,
+    "unfinished_or_failed_labels": 69,
+    "label_agreement_on_queried_sample": {
+      "n": 202,
+      "agree": 200,
+      "live_positive_gold_positive": 4,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 2
+    },
+    "label_tokens": {
+      "prompt_tokens": 1421676,
+      "completion_tokens": 90801,
+      "total_tokens": 1512477,
+      "cached_tokens": 705176,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 10.317194491136119,
+      "median": 8.08661406300962,
+      "maximum": 73.46162197180092
+    },
+    "agent_calls": 6,
+    "agent_tokens": {
+      "prompt_tokens": 34217,
+      "completion_tokens": 5343,
+      "total_tokens": 39560,
+      "cached_tokens": 0,
+      "reasoning_tokens": 765
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r2",
+    "method": "baseline",
+    "job": "job04",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:05:16Z",
+    "status": "running",
+    "label_attempts": 105,
+    "successful_labels": 70,
+    "positive_labels": 0,
+    "unfinished_or_failed_labels": 35,
+    "label_agreement_on_queried_sample": {
+      "n": 70,
+      "agree": 70,
+      "live_positive_gold_positive": 0,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 0
+    },
+    "label_tokens": {
+      "prompt_tokens": 493271,
+      "completion_tokens": 27252,
+      "total_tokens": 520523,
+      "cached_tokens": 253240,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 7.584985585776823,
+      "median": 7.508861207403243,
+      "maximum": 9.582965889945626
+    },
+    "agent_calls": 8,
+    "agent_tokens": {
+      "prompt_tokens": 48163,
+      "completion_tokens": 5207,
+      "total_tokens": 53370,
+      "cached_tokens": 7480,
+      "reasoning_tokens": 625
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r2",
+    "method": "hydra",
+    "job": "job01",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:12:42Z",
+    "status": "running",
+    "label_attempts": 185,
+    "successful_labels": 176,
+    "positive_labels": 39,
+    "unfinished_or_failed_labels": 9,
+    "label_agreement_on_queried_sample": {
+      "n": 176,
+      "agree": 147,
+      "live_positive_gold_positive": 23,
+      "live_positive_gold_negative": 16,
+      "live_negative_gold_positive": 13
+    },
+    "label_tokens": {
+      "prompt_tokens": 1478490,
+      "completion_tokens": 85073,
+      "total_tokens": 1563563,
+      "cached_tokens": 621200,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 9.193089199157178,
+      "median": 9.191459799185395,
+      "maximum": 13.377699360251427
+    },
+    "agent_calls": 0,
+    "agent_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_models": []
+  },
+  {
+    "round": "r2",
+    "method": "hydra",
+    "job": "job04",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:12:42Z",
+    "status": "running",
+    "label_attempts": 199,
+    "successful_labels": 184,
+    "positive_labels": 3,
+    "unfinished_or_failed_labels": 15,
+    "label_agreement_on_queried_sample": {
+      "n": 184,
+      "agree": 178,
+      "live_positive_gold_positive": 3,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 6
+    },
+    "label_tokens": {
+      "prompt_tokens": 1474818,
+      "completion_tokens": 73274,
+      "total_tokens": 1548092,
+      "cached_tokens": 607776,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 7.742968265291141,
+      "median": 7.553974609822035,
+      "maximum": 11.659611489623785
+    },
+    "agent_calls": 0,
+    "agent_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "agent_models": []
+  },
+  {
+    "round": "r2",
+    "method": "lo_ph",
+    "job": "job01",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:04:41Z",
+    "status": "running",
+    "label_attempts": 156,
+    "successful_labels": 125,
+    "positive_labels": 0,
+    "unfinished_or_failed_labels": 31,
+    "label_agreement_on_queried_sample": {
+      "n": 125,
+      "agree": 125,
+      "live_positive_gold_positive": 0,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 0
+    },
+    "label_tokens": {
+      "prompt_tokens": 901530,
+      "completion_tokens": 56509,
+      "total_tokens": 958039,
+      "cached_tokens": 412976,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 8.26028946211934,
+      "median": 8.029553696513176,
+      "maximum": 16.55318303219974
+    },
+    "agent_calls": 20,
+    "agent_tokens": {
+      "prompt_tokens": 120458,
+      "completion_tokens": 10584,
+      "total_tokens": 131042,
+      "cached_tokens": 14560,
+      "reasoning_tokens": 4031
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r2",
+    "method": "lo_ph",
+    "job": "job04",
+    "source_commit": "effd064775111ea2439cc83d9d0e52323f8687e6",
+    "started_at": "2026-09-15T17:05:16Z",
+    "status": "running",
+    "label_attempts": 31,
+    "successful_labels": 21,
+    "positive_labels": 0,
+    "unfinished_or_failed_labels": 10,
+    "label_agreement_on_queried_sample": {
+      "n": 21,
+      "agree": 20,
+      "live_positive_gold_positive": 0,
+      "live_positive_gold_negative": 0,
+      "live_negative_gold_positive": 1
+    },
+    "label_tokens": {
+      "prompt_tokens": 157338,
+      "completion_tokens": 8120,
+      "total_tokens": 165458,
+      "cached_tokens": 66232,
+      "reasoning_tokens": 0
+    },
+    "label_latency_seconds": {
+      "mean": 7.596262475032182,
+      "median": 7.45333113707602,
+      "maximum": 10.137479152530432
+    },
+    "agent_calls": 20,
+    "agent_tokens": {
+      "prompt_tokens": 83079,
+      "completion_tokens": 10256,
+      "total_tokens": 93335,
+      "cached_tokens": 9640,
+      "reasoning_tokens": 4767
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"

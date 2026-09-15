@@ -238,6 +238,7 @@ print(op.usage())                # llm_calls、max_calls、remaining
 - 每个 ID 单独去重，预算预留时短暂加全局锁；独立候选人的网络请求可并发。失败占预算且不自动重试。
 - `_config/llm.json` 可用 `label_kwargs` 设置标注请求参数；示例关闭豆包深度思考并设 temperature=0，不影响 code agent 的模型参数。
 - 示例还启用 JSON 输出模式。标注器允许代码围栏和说明文字中的换行，仍严格检查 ID 和布尔结果；解析失败的响应也保存用量。
+- 多个实验共用接口时，可设置 `label_interval`（秒，缺省 0）；同一用户、同一 endpoint/model 的请求共用本机节奏。示例为 0.65 秒，以减少共享 TPM 限流；具体数值按接口额度调整。
 - 请求前持久化计数，失败、超时和非法 JSON 都占一次预算，不自动重试；再次显式调用失败 ID 会再计一次。
 - 预算耗尽抛出 `BudgetExceeded`，成功缓存仍可读取。不要修改缓存或在同一工作区更换岗位、模型和规则。
 - `output/usage.json` 自动更新；评估直接从 SQLite 请求记录读取次数，`usage_source="semantic_operator"`。

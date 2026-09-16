@@ -334,6 +334,12 @@ python benchmarks/run_full.py hydra --job job01 --run-dir results/hydra-job01
 
 设置 `OKAGENT_QWEN_CACHE` 可让不同工作区共享一次编码结果。正式比较仍应为每个方法使用新的
 run-dir 和独立 2,000 次标注账本；`precompute` 不调用标注 API。
+完成岗位特征预计算后，可用下列命令并发运行完整比较矩阵；每组输出、日志和账本相互隔离，
+`manifest.json` 记录退出码与耗时：
+
+```bash
+python benchmarks/run_matrix.py --tag qwen-v1 --jobs job01 job04 --max-parallel 3
+```
 
 ### 离线 replay：无需模型接口或 API key
 

@@ -236,6 +236,8 @@ def test_concurrent_callbacks_preserve_algorithm():
 def test_hiring_cpu_profile_is_regularized_and_uses_budget():
     config = Config.hiring_cpu(max_calls=123, label_workers=2)
     assert config.max_calls == 123 and config.label_workers == 2
+    assert config.sample_size == 78
+    assert config.sample_size + config.calibration_sample_size == config.max_calls
     assert config.lr_lambda > 0 and config.target_recall == 0.9
     assert not config.adaptive
 

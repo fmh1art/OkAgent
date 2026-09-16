@@ -332,6 +332,17 @@ python benchmarks/run_full.py lo_ph --job job01 --run-dir results/lo-ph-job01
 python benchmarks/run_full.py hydra --job job01 --run-dir results/hydra-job01
 ```
 
+先做小规模端到端验证时，可显式选择服务器已有的 1k 数据库并覆盖标注预算：
+
+```bash
+python benchmarks/run_full.py precompute --job job01 --dataset 1k --max-calls 200 --run-dir results/qwen-job01-1k
+python benchmarks/run_matrix.py --tag qwen-1k --jobs job01 --dataset 1k --max-calls 200 --max-parallel 3
+```
+
+1k 库的类别分布与 full 库明显不同，结果只用于流程和相对行为检查，不能替代 full 评估。
+Hydra 的 CPU profile 会按约 64%/36% 自动拆分训练与校准预算；200 次预算对应
+128 个训练标签和 72 个校准标签。
+
 设置 `OKAGENT_QWEN_CACHE` 可让不同工作区共享一次编码结果。正式比较仍应为每个方法使用新的
 run-dir 和独立 2,000 次标注账本；`precompute` 不调用标注 API。
 完成岗位特征预计算后，可用下列命令并发运行完整比较矩阵；每组输出、日志和账本相互隔离，

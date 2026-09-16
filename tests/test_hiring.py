@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import duckdb
 import pytest
@@ -54,3 +55,18 @@ def test_missing_job_data_and_existing_run(source, run, tmp_path):
         prepare(source, tmp_path / "missing", job="job06")
     with pytest.raises(FileExistsError):
         prepare(source, run)
+
+
+def test_prepare_dataset_variant_and_budget_override(source, tmp_path):
+    config = json.loads(source.read_text())
+    raw = (source.parent / config["raw_root"]).resolve()
+    databases = raw / "job-candidate-embedding-20260722"
+    shutil.copyfile(databases / "hiring_job01_full_segvec.db",
+                    databases / "hiring_job01_1k_segvec.db")
+    run = tmp_path / "subset"
+    prepare(source, run, dataset="1k", max_calls=2)
+    task = json.loads((run / "task.json").read_text())
+    settings = json.loads((run / "workspace/settings.json").read_text())
+    assert task["dataset"] == "1k" and task["data"].endswith("hiring_job01_1k_segvec.db")
+    assert task["max_calls"] == settings["max_calls"] == 2
+    assert "最多 2 次" in (run / "workspace/prompt.md").read_text()

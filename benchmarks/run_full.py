@@ -18,11 +18,13 @@ def main():
     parser.add_argument("--job", required=True)
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--config", default="_config/hiring.json")
+    parser.add_argument("--dataset", default="full")
+    parser.add_argument("--max-calls", type=int)
     parser.add_argument("--command-timeout", type=int, default=7200)
     args = parser.parse_args()
     run_dir = Path(args.run_dir).resolve()
     if not run_dir.exists():
-        prepare(args.config, run_dir, job=args.job)
+        prepare(args.config, run_dir, job=args.job, dataset=args.dataset, max_calls=args.max_calls)
     task = json.loads((run_dir / "task.json").read_text(encoding="utf-8"))
 
     if args.method == "precompute":

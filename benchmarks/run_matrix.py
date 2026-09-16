@@ -17,6 +17,8 @@ def main():
     parser.add_argument("--results-root", default="results")
     parser.add_argument("--max-parallel", type=int, default=3)
     parser.add_argument("--config", default="_config/hiring.json")
+    parser.add_argument("--dataset", default="full")
+    parser.add_argument("--max-calls", type=int)
     args = parser.parse_args()
     if args.max_parallel <= 0:
         raise ValueError("max-parallel must be positive")
@@ -39,7 +41,10 @@ def main():
         job, method, run_dir, log = entry
         started = time.time()
         command = [sys.executable, "benchmarks/run_full.py", method, "--job", job,
-                   "--run-dir", str(run_dir), "--config", args.config]
+                   "--run-dir", str(run_dir), "--config", args.config,
+                   "--dataset", args.dataset]
+        if args.max_calls is not None:
+            command.extend(["--max-calls", str(args.max_calls)])
         with log.open("w", encoding="utf-8") as stream:
             completed = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT,
                                        env=os.environ.copy(), check=False)
@@ -52,6 +57,7 @@ def main():
 
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     manifest = dict(tag=args.tag, source_commit=commit, jobs=args.jobs, methods=args.methods,
+                    dataset=args.dataset, max_calls=args.max_calls,
                     max_parallel=args.max_parallel, started=time.time(), runs=[])
     manifest_path = log_dir / "manifest.json"
     with ThreadPoolExecutor(max_workers=args.max_parallel) as pool:

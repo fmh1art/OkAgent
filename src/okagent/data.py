@@ -23,7 +23,7 @@ def llm_config():
                 label_interval=float(config.get("label_interval", 0)))
 
 
-def prepare(config_path, run_dir, job=None):
+def prepare(config_path, run_dir, job=None, *, dataset="full", max_calls=None):
     config_path = Path(config_path).resolve()
     config = json.loads(config_path.read_text(encoding="utf-8"))
     raw = (config_path.parent / config["raw_root"]).resolve()
@@ -32,13 +32,17 @@ def prepare(config_path, run_dir, job=None):
     if len(descriptions) != 1:
         raise ValueError(f"Expected one job description for {job}")
     databases = raw / "job-candidate-embedding-20260722"
-    data = databases / f"hiring_{job}_full_segvec.db"
+    if not isinstance(dataset, str) or not dataset or not dataset.replace("_", "").isalnum():
+        raise ValueError("dataset must be a nonempty alphanumeric variant such as 'full' or '1k'")
+    data = databases / f"hiring_{job}_{dataset}_segvec.db"
     labels = databases / f"hiring_{job}_llm_pass.db"
     for path in (data, labels, raw / "llm_prompt.txt"):
         if not path.is_file():
             raise FileNotFoundError(f"{job}: missing {path}")
-    if type(config["max_calls"]) is not int or config["max_calls"] < 0:
+    max_calls = config["max_calls"] if max_calls is None else max_calls
+    if type(max_calls) is not int or max_calls < 0:
         raise ValueError("max_calls must be a nonnegative integer")
+    config = dict(config, max_calls=max_calls)
     description = json.loads(descriptions[0].read_text(encoding="utf-8"), strict=False)
     with duckdb.connect(str(data), read_only=True) as con:
         count = con.execute("SELECT count(DISTINCT candidate_id) FROM candidate_segments").fetchone()[0]
@@ -51,8 +55,8 @@ def prepare(config_path, run_dir, job=None):
     write_json(workspace / "job.json", description)
     write_json(workspace / "settings.json", dict(as_of=config["as_of"], max_calls=config["max_calls"]))
     shutil.copyfile(raw / "llm_prompt.txt", workspace / "label_prompt.txt")
-    write_json(run_dir / "task.json", dict(job=job, data=str(data), labels=str(labels),
-                                          max_calls=config["max_calls"]))
+    write_json(run_dir / "task.json", dict(job=job, dataset=dataset, data=str(data), labels=str(labels),
+                                          max_calls=max_calls))
     prompt = workspace / "prompt.md"
     prompt.write_text(build_prompt(workspace, description, count, config), encoding="utf-8")
     return prompt

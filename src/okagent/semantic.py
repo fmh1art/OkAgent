@@ -21,6 +21,10 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+class InvalidLabelResponse(ValueError):
+    """The endpoint returned a syntactically or structurally invalid judgment."""
+
+
 class SemanticOperator:
     def __init__(self, workspace="."):
         self.workspace = Path(workspace).resolve()
@@ -48,6 +52,15 @@ class SemanticOperator:
                     remaining=max(0, self.settings["max_calls"] - calls))
 
     def label(self, candidate_id: str) -> int:
+        """Return one label, retrying malformed model output within the charged budget."""
+        for attempt in range(3):
+            try:
+                return self._label_once(candidate_id)
+            except InvalidLabelResponse:
+                if attempt == 2 or self.usage()["remaining"] == 0:
+                    raise
+
+    def _label_once(self, candidate_id: str) -> int:
         if not isinstance(candidate_id, str):
             raise ValueError("candidate_id must be a string")
         # Deduplicate the same person across processes without serializing independent requests.
@@ -110,11 +123,16 @@ class SemanticOperator:
             content = (raw or "").strip()
             if content.startswith("```") and content.endswith("```"):
                 content = content.split("\n", 1)[-1].rsplit("```", 1)[0]
-            result = json.loads(content, strict=False)  # Some endpoints leave literal newlines in explanations.
+            try:
+                # Some endpoints leave literal newlines in explanations.
+                result = json.loads(content, strict=False)
+            except json.JSONDecodeError as error:
+                raise InvalidLabelResponse("Expected one JSON label object") from error
             if (not isinstance(result, dict) or result.get("candidate_id") != candidate_id
                     or not isinstance(result.get("is_match"), dict)
                     or type(result["is_match"].get("result")) is not bool):
-                raise ValueError("Expected the requested candidate_id and a boolean is_match.result")
+                raise InvalidLabelResponse(
+                    "Expected the requested candidate_id and a boolean is_match.result")
             label = int(result["is_match"]["result"])
             result.update(metadata)
             self._record(call_id, result, label)
@@ -141,6 +159,6 @@ class SemanticOperator:
         return row[0] if row else None
 
     def label_many(self, candidate_ids, workers=8):
-        """Independent one-person requests; ordered results, shared budget, no hidden retries."""
+        """Independent one-person requests; ordered results and a shared charged budget."""
         with ThreadPoolExecutor(max_workers=workers) as pool:
             return list(pool.map(self.label, candidate_ids))

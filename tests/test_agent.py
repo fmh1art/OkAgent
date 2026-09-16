@@ -92,10 +92,8 @@ def test_failed_requests_charge_and_budget_persists(run, llm, bad_response):
     op = SemanticOperator(run / "workspace")
     with pytest.raises(Exception, match="test failure"):
         op.label("a")
-    assert len(requests) == 1  # HTTP errors must not trigger hidden retries.
-    with pytest.raises(ValueError):
-        op.label("a")
-    assert SemanticOperator(run / "workspace").label("a") == 1
+    assert len(requests) == 1  # HTTP errors are surfaced; only malformed judgments retry.
+    assert op.label("a") == 1
     with pytest.raises(BudgetExceeded):
         SemanticOperator(run / "workspace").label("b")
     assert op.label("a") == 1  # Cached successes remain available after exhaustion.

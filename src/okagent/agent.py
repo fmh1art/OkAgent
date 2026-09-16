@@ -21,6 +21,11 @@ def make_model():
     if config["api_key"]:
         os.environ.setdefault("OPENAI_API_KEY", config["api_key"])
     return LitellmModel(model_name=name, cost_tracking="ignore_errors",
+                        observation_template=("{% if output.exception_info %}<exception>{{output.exception_info}}</exception>{% endif %}"
+                            "<returncode>{{output.returncode}}</returncode>\n<output>\n"
+                            "{% if output.output|length <= 20000 %}{{output.output}}{% else %}"
+                            "{{output.output[:10000]}}\n[Output truncated; inspect the file in smaller slices.]\n"
+                            "{{output.output[-10000:]}}{% endif %}</output>"),
                         model_kwargs={"api_base": config["base_url"], "timeout": 120, "max_tokens": 8192})
 
 

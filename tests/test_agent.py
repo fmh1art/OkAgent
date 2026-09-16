@@ -252,3 +252,17 @@ def test_optional_endpoint_pacing_applies_to_parallel_requests(run, llm, monkeyp
     llm[1].extend([(200, response)] * 3)
     assert SemanticOperator(run / 'workspace').label_many(list('abc'), workers=3) == [0, 0, 0]
     assert max(arrivals) - min(arrivals) >= 0.18
+
+
+def test_large_tool_output_keeps_error_and_tail_without_filling_context(llm, monkeypatch):
+    from okagent.agent import make_model
+    monkeypatch.setenv('OKAGENT_CODE_MODEL', 'openai/test')
+    model = make_model()
+    raw = 'START' + 'x' * 100000 + 'END'
+    messages = model.format_observation_messages(
+        {'extra': {'actions': [{'command': 'cat large.json', 'tool_call_id': 'call_test'}]}},
+        [{'output': raw, 'returncode': 1, 'exception_info': 'failed'}])
+    observation = messages[0]
+    assert len(observation['content']) < 21000
+    assert all(part in observation['content'] for part in ['START', 'END', 'truncated', 'failed', '<returncode>1'])
+    assert observation['extra']['raw_output'] == raw

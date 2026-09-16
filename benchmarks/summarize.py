@@ -55,7 +55,7 @@ def summarize(run):
         calls += trajectory['info'].get('model_stats', {}).get('api_calls', 0)
         for message in trajectory['messages']:
             response = message.get('extra', {}).get('response', {})
-            if message['role'] == 'assistant' and response:
+            if isinstance(response, dict) and response:
                 usages.append(response.get('usage', {}))
                 models.add(response.get('model', 'unknown'))
     result['agent_calls'] = calls

@@ -35,7 +35,7 @@ def snapshot(round_name):
 
 
 def run_case(round_name, method, job="job01", *, resume=False, previous_run=None,
-             validation_ids=None, validation_fixed=True):
+             validation_ids=None, validation_fixed=True, validation_sample_ids=None):
     directory = ROOT / "results/comparison" / round_name
     sys.path.insert(0, str(directory / "runtime"))
     os.environ["OKAGENT_LLM_CONFIG"] = str(ROOT / "_config/llm.json")
@@ -72,6 +72,13 @@ def run_case(round_name, method, job="job01", *, resume=False, previous_run=None
                             "validation_fixed=true时补齐该固定验证样本，否则在此独立池随机抽约400人并冻结为验证样本。"
                             "训练可继续主动采样全库中不在验证池且未标注的ID。不要重新划分。批量读取并缓存特征，"
                             "训练、主动采样和部署必须使用相同的特征处理。统一用workers=8，标注器已负责全局限速。")
+        if validation_sample_ids is not None:
+            sample = set(validation_sample_ids)
+            if not sample.issubset(validation):
+                raise ValueError("Fixed validation sample must belong to the original validation pool")
+            write_json(workspace / "continuation_validation_sample.json", sorted(sample))
+            continuation["validation_sample"] = "continuation_validation_sample.json"
+            continuation["instruction"] += " validation_sample 已给定时必须复用该固定样本，不能重新抽取；整个validation_pool仍禁止训练。"
         write_json(workspace / "continuation.json", continuation)
         with (workspace / "prompt.md").open("a") as prompt:
             prompt.write("\n## 续跑要求（优先于默认重新划分步骤）\n先读取 continuation.json，严格复用其中的验证划分、已有标签和预算。\n")

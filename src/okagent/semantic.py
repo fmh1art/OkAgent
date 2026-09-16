@@ -37,12 +37,12 @@ class SemanticOperator:
                         'result 必须是按上述匹配规则判断的布尔 true 或 false。')
         self.template = Template(rules + "# 候选人画像\n{{ candidate_text }}\n# 输出要求\n" + output_rules,
                                  undefined=StrictUndefined)
-        with closing(sqlite3.connect(self.state)) as db:
+        with closing(sqlite3.connect(self.state, timeout=30)) as db:
             db.execute("CREATE TABLE IF NOT EXISTS queries (call_id INTEGER PRIMARY KEY, "
                        "candidate_id TEXT NOT NULL, label INTEGER, response TEXT)")
 
     def usage(self):
-        with closing(sqlite3.connect(self.state)) as db:
+        with closing(sqlite3.connect(self.state, timeout=30)) as db:
             calls = db.execute("SELECT count(*) FROM queries").fetchone()[0]
         return dict(llm_calls=calls, max_calls=self.settings["max_calls"],
                     remaining=max(0, self.settings["max_calls"] - calls))
@@ -130,12 +130,12 @@ class SemanticOperator:
 
     def cached_labels(self):
         """Read successful labels without issuing requests or spending budget."""
-        with closing(sqlite3.connect(self.state)) as db:
+        with closing(sqlite3.connect(self.state, timeout=30)) as db:
             return dict(db.execute("SELECT candidate_id,label FROM queries WHERE label IS NOT NULL"))
 
     def get_label(self, candidate_id):
         """Return a cached label, or None; never query the model."""
-        with closing(sqlite3.connect(self.state)) as db:
+        with closing(sqlite3.connect(self.state, timeout=30)) as db:
             row = db.execute("SELECT label FROM queries WHERE candidate_id=? AND label IS NOT NULL",
                              [candidate_id]).fetchone()
         return row[0] if row else None

@@ -51,7 +51,7 @@ def run_case(round_name, method, job="job01", *, resume=False, previous_run=None
         previous = json.loads((run / "experiment.json").read_text())
         archive = run / "previous_attempts" / str(time.time_ns())
         archive.mkdir(parents=True)
-        for path in [run / "experiment.json", run / "error.txt", *run.glob("*.trajectory.json")]:
+        for path in [run / "experiment.json", run / "evaluation.json", run / "error.txt", *run.glob("*.trajectory.json")]:
             if path.exists():
                 shutil.move(path, archive / path.name)
     else:

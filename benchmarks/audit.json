@@ -148,5 +148,74 @@
       "unknown_ids": 0
     },
     "elapsed_seconds": 78.63628736697137
+  },
+  {
+    "round": "r4",
+    "method": "lo_ph",
+    "job": "job01",
+    "validation_pool_size": 6953,
+    "validation_labeled": 400,
+    "validation_positive": 4,
+    "training_cached": 1355,
+    "training_positive": 149,
+    "feature": "first_segment",
+    "normalize_input": false,
+    "model_artifact": "operators/proxy-4d359feadc11/model.pkl",
+    "threshold": 0.05374179030094278,
+    "largest_qualifying_threshold": 0.05374179030094278,
+    "proxy_validation_before_override": {
+      "tp": 4,
+      "fp": 370,
+      "fn": 0,
+      "precision": 0.0106951871657754,
+      "recall": 1.0
+    },
+    "validation_deployment_feature_mismatch": true,
+    "deployment_feature": "mean_segments",
+    "note": "R4 validation used LIMIT 1, but training and deployment used segment mean; corrected in R6 using the same fitted model."
+  },
+  {
+    "round": "r4",
+    "method": "lo_ph",
+    "job": "job04",
+    "validation_pool_size": 400,
+    "validation_labeled": 400,
+    "validation_positive": 5,
+    "training_cached": 1489,
+    "training_positive": 75,
+    "feature": "mean_segments",
+    "normalize_input": false,
+    "model_artifact": "operators/proxy-c3fd0f35029d/model.pkl",
+    "threshold": 0.2596797215104758,
+    "largest_qualifying_threshold": 0.2596797215104758,
+    "proxy_validation_before_override": {
+      "tp": 5,
+      "fp": 77,
+      "fn": 0,
+      "precision": 0.06097560975609756,
+      "recall": 1.0
+    }
+  },
+  {
+    "round": "r6",
+    "method": "lo_ph",
+    "job": "job01",
+    "validation_pool_size": 6953,
+    "validation_labeled": 400,
+    "validation_positive": 4,
+    "training_cached": 1355,
+    "training_positive": 149,
+    "feature": "mean_segments",
+    "normalize_input": false,
+    "model_artifact": "trained_proxy.pkl",
+    "threshold": 0.4491167114392264,
+    "largest_qualifying_threshold": 0.4491167114392264,
+    "proxy_validation_before_override": {
+      "tp": 4,
+      "fp": 14,
+      "fn": 0,
+      "precision": 0.2222222222222222,
+      "recall": 1.0
+    }
   }
 ]

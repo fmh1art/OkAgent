@@ -1690,5 +1690,92 @@
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
     ]
+  },
+  {
+    "round": "r6",
+    "method": "lo_ph",
+    "job": "job01",
+    "status": "complete",
+    "initial_calls": 1917,
+    "previous_run": "/data00/home/fanmeihao/projects/OkAgent/results/comparison/r4/lo_ph-job01",
+    "source_commit": "550383696755cbd42dcf4ff5cc310f0c86adb109",
+    "started_at": "2026-09-16T02:31:44Z",
+    "kind": "Deploy-only correction via physical agent; same trained model, labels and validation; no planner rerun",
+    "source_model_sha256": "b5dde14093c6fb2125c26795348d55ae72747706965bed0249f6e64640f8e0f8",
+    "artifacts": {
+      "metrics": "operators/deploy-d8c5e15bbe11/artifacts/metrics.json",
+      "candidate_ids": "operators/deploy-d8c5e15bbe11/artifacts/candidate_ids.json"
+    },
+    "elapsed_seconds": 475.68946297766934,
+    "manual_correction": "Descending scores: change last qualifying position to first; add independent precision_recall_curve assertion. Same model, labels, split and budget.",
+    "correction_started_at": "2026-09-16T02:37:06.928964+00:00",
+    "corrected_at": "2026-09-16T02:40:55.356071+00:00",
+    "model_hash_unchanged": true,
+    "new_candidate_labels": 0,
+    "evaluation": {
+      "job": "job01",
+      "candidate_count": 34761,
+      "selected_count": 766,
+      "evaluated_count": 34761,
+      "unknown_gold_count": 0,
+      "tp": 207,
+      "fp": 559,
+      "fn": 175,
+      "tn": 33820,
+      "recall": 0.5418848167539267,
+      "precision": 0.27023498694516973,
+      "f1": 0.3606271777003484,
+      "llm_calls": 1917,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "semantic_operator"
+    },
+    "label_attempts": 1917,
+    "successful_labels": 1877,
+    "positive_labels": 170,
+    "unfinished_or_failed_labels": 40,
+    "new_label_attempts": 0,
+    "new_label_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1877,
+      "agree": 1767,
+      "live_positive_gold_positive": 113,
+      "live_positive_gold_negative": 57,
+      "live_negative_gold_positive": 53
+    },
+    "historical_recall_ceiling_with_cache_override": 0.8612565445026178,
+    "label_tokens": {
+      "prompt_tokens": 14807740,
+      "completion_tokens": 128653,
+      "total_tokens": 14936393,
+      "cached_tokens": 6242728,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 2.5577596740575936,
+      "median": 2.0070553654804826,
+      "maximum": 16.55318303219974
+    },
+    "agent_calls": 5,
+    "agent_calls_with_recorded_usage": 5,
+    "agent_tokens": {
+      "prompt_tokens": 28381,
+      "completion_tokens": 4699,
+      "total_tokens": 33080,
+      "cached_tokens": 0,
+      "reasoning_tokens": 2134
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
   }
 ]

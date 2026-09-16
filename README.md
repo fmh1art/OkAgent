@@ -76,6 +76,7 @@ proxy.save("output/proxy.pkl", threshold=threshold)
 ```
 
 服务器真实 CPU 冒烟中，模型进程峰值内存约 5.1 GiB；权重已缓存后的冷启动加两人评分约 15 秒。
+full 库默认使用 512 tokens、batch 32、两条 demonstrations，并把岗位和当前简历放在 prompt 尾部，避免左截断丢失决策输入。
 全库分数会按数据库、岗位、配置和 demonstrations 缓存到 `OKAGENT_QWEN_CAUSAL_CACHE`。
 
 ### 没有 uv 时

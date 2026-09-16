@@ -52,6 +52,9 @@ def test_qwen_causal_model_is_the_classifier_and_scores_are_cached(tmp_path):
                             config=QwenCausalConfig(batch_size=2, max_demonstrations=2),
                             cache_dir=tmp_path / "cache", tokenizer=tokenizer, model=model)
     proxy.fit({"a": 1, "b": 0})
+    prompt = proxy._prompt("a", tokenizer)
+    assert prompt.rfind("岗位：") > prompt.rfind("已由昂贵标注模型判断的示例")
+    assert prompt.rfind("当前候选人简历") > prompt.rfind("岗位：")
     scores = proxy.score_ids(["a", "b", "c"])
     assert scores[0] > 0.9 and scores[1] < 0.1 and scores[2] > 0.9
     assert model.calls == 2

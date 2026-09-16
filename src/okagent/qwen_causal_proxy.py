@@ -17,11 +17,11 @@ from .qwen_proxy import load_resume_texts
 @dataclass(frozen=True)
 class QwenCausalConfig:
     model_name: str = "Qwen/Qwen3-0.6B"
-    max_length: int = 768
-    max_resume_chars: int = 1200
-    demonstration_chars: int = 320
-    max_demonstrations: int = 4
-    batch_size: int = 4
+    max_length: int = 512
+    max_resume_chars: int = 500
+    demonstration_chars: int = 100
+    max_demonstrations: int = 2
+    batch_size: int = 32
 
     def validate(self):
         for name in ("max_length", "max_resume_chars", "demonstration_chars",
@@ -116,12 +116,13 @@ class QwenCausalProxy:
             text = self.texts[example_id][:self.config.demonstration_chars]
             examples.append(f"简历：{text}\n答案：{'B' if label else 'A'}")
         examples_text = "\n\n".join(examples) if examples else "（暂无示例）"
-        user = f"""岗位：{self.job}
-
-任务：判断候选人是否满足岗位的全部必备条件。A=不匹配，B=匹配。
-已由昂贵标注模型判断的示例：
+        # Put the current role and resume last: left truncation may discard old
+        # demonstrations, but must never discard the decision inputs.
+        user = f"""已由昂贵标注模型判断的示例：
 {examples_text}
 
+岗位：{self.job}
+任务：判断候选人是否满足岗位的全部必备条件。A=不匹配，B=匹配。
 当前候选人简历：
 {self.texts[candidate_id]}
 

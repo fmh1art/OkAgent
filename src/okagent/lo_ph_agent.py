@@ -20,7 +20,7 @@ CONTRACTS = {
     "partition": "输入 table；按指定方法分区。返回各分区的 ID 数组 JSON，分区互斥且并集等于输入，artifacts 的键为分区名。",
     "sample": "输入 table，可选 exclude；返回 artifacts.table（ID 数组 JSON）。去重、属于输入、与 exclude 不相交，检查数量和随机种子。",
     "label": "输入 table；用 SemanticOperator('.').label_many(ids, workers=8) 发出独立逐人请求。返回 artifacts.table（JSON 行数组，每行 candidate_id 和整数 label=0/1），覆盖输入 ID。",
-    "proxy": "输入 train，可选 validation；仅用 train 拟合特征和模型，处理不均衡、单类及泄漏。返回 artifacts.model（pickle，含拟合的特征变换和模型）。",
+    "proxy": "输入 train，可选 validation；仅用 train 拟合特征和模型，优先使用 CPU Qwen3-Embedding-0.6B 缓存特征，处理不均衡、单类及泄漏。返回 artifacts.model（pickle，含特征 backend/config、变换和模型）。",
     "deploy": "输入 table、model，可选 validation；按指定方法选择阈值并预测完整输入，缓存的真实标签覆盖预测。返回 artifacts.candidate_ids（去重的匹配 ID 数组 JSON）和验证说明。",
 }
 REQUIRED_INPUTS = {"partition": {"table"}, "sample": {"table"}, "label": {"table"},
@@ -43,7 +43,7 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 严格遵守输入、方法和输出约定，实际写代码、运行并自检；不要另行规划整个实验或递归启动 agent。
 复用当前 workspace 的已有输入和 SemanticOperator 预算/缓存，不修改输入文件和其他算子的产物。
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
-Proxy 优先将 Normalizer/特征变换与分类器保存为 sklearn Pipeline；若读取 pickle 字典，Sample/Deploy 必须应用其中声明的变换，不能只取 model 后直接预测原始向量。先用少量数据验证模型接口和变换，再跑全库。
+Proxy 优先调用 okagent.qwen_proxy.load_qwen_features，并保存 backend/config/cache 元数据；将 Normalizer/特征变换与分类器保存为 sklearn Pipeline。若读取 pickle 字典，Sample/Deploy 必须应用其中声明的变换，不能只取 model 后直接预测原始向量。先用 2 条文本验证 Qwen 接口，再跑全库；仅在依赖或下载明确失败时回退已有向量并报告。
 主动采样从 SemanticOperator('.').cached_labels() 的键排除全部已标注 ID，不能只用启动时的训练文件；读取行数组时提取 row['candidate_id']，不能把整个字典转成字符串当 ID。
 Deploy 用同一个特征函数处理验证 ID 和全库 ID；若训练取全部分段均值，验证也必须取均值，禁止用 LIMIT 1 替代。自检同一 ID 在两条路径中的向量和分数一致。
 阈值按 precision_recall_curve 的升序 thresholds 取 np.flatnonzero(recall[:-1] >= 0.9)[-1]；若自行按分数降序累计召回，则取第一个达标位置，不能取最后一个。自检没有更大的合格阈值。

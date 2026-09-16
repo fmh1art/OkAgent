@@ -6,6 +6,7 @@
 
 - **主项目**：准备工作区和任务 prompt，由最基础的 mini-swe-agent 编写、执行采样、标注、proxy 训练及预测代码，最后统一评估。
 - **复现方法**：`other_methods/hydra` 实现 Hydra 的主动采样、逻辑回归与 recall 阈值校准，可直接运行。
+- **CPU Qwen proxy**：三个方法可复用 Qwen3-Embedding-0.6B 的缓存语义特征；Qwen 只提取特征，不充当标签 oracle。
 
 所有入口都是 Python 函数。code agent 只有“模型 → bash → 观察结果”的循环，逐人标注由 `SemanticOperator` 提供。
 
@@ -50,6 +51,9 @@ source .venv/bin/activate
 
 # 主项目、code agent、训练工具及测试依赖
 uv pip install -e '.[agent,test]'
+
+# 启用 CPU Qwen proxy（transformers>=4.51）
+uv pip install -e '.[agent,test,proxy]'
 
 # other_methods/hydra 的复现环境
 uv pip install -r other_methods/hydra/requirements.txt
@@ -204,7 +208,7 @@ print(result["evaluation"])
 参考的是 `OptiHarnessForCost/agent/mini-swe-agent` 的基础结构，运行时通过已安装的包调用，不依赖参考项目路径。
 组件组合方式见 [mini-swe-agent Python 用法](https://mini-swe-agent.com/latest/advanced/cookbook/)。
 
-prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → 中文字符 TF-IDF + 加权逻辑回归 → 增量采样 → recall 优先的阈值选择 → 全库预测。
+prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → CPU Qwen3-Embedding-0.6B 缓存特征 + 加权逻辑回归/ensemble → 增量采样 → recall 优先的阈值选择 → 全库预测。
 同时约束类别极不均衡、单类训练、验证集无正例、采样偏差与标签覆盖预测等情况。
 Partition、Sample、Label、Proxy、Deploy 只表示代码阶段。具体训练脚本由 code agent 编写。
 
@@ -314,6 +318,22 @@ Label 提交时检查完整 ID 覆盖和成功缓存中的标签；模型、特�
 先完成第 2 节的 Hydra 依赖安装。该实现复现压缩包实际启用的路径：
 **主动采样 → 逻辑回归 → 目标 recall 单阈值校准 → 全库预测**。
 NumPy/SciPy 替代原模型实现，DuckDB 和 Python 回调替代内部运行依赖。
+
+优化后的 CPU 招聘配置可用 `Config.hiring_cpu(max_calls=2000)`；配合
+`run_hiring(..., feature_backend="qwen")` 使用 256 维 Qwen 语义特征和岗位 query 初始化，
+并启用正则化、更大的训练/校准预算。默认 `Config()` 和 `feature_backend="stored"` 仍保留，便于复现旧结果。
+
+统一的全量实验入口为：
+
+```bash
+python benchmarks/run_full.py precompute --job job01 --run-dir results/qwen-job01
+python benchmarks/run_full.py baseline --job job01 --run-dir results/baseline-job01
+python benchmarks/run_full.py lo_ph --job job01 --run-dir results/lo-ph-job01
+python benchmarks/run_full.py hydra --job job01 --run-dir results/hydra-job01
+```
+
+设置 `OKAGENT_QWEN_CACHE` 可让不同工作区共享一次编码结果。正式比较仍应为每个方法使用新的
+run-dir 和独立 2,000 次标注账本；`precompute` 不调用标注 API。
 
 ### 离线 replay：无需模型接口或 API key
 

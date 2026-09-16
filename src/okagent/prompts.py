@@ -16,8 +16,11 @@ PROXY_SKILL = """## 稀少正例 proxy 实验要点
 - seed=42；先稳定排序 ID 再随机抽样，不从无序 set 采样。固定随机验证集约占预算 20%，与训练及主动采样始终互斥。
 - 训练先随机探索（约 400 人，随总预算缩放），单类时继续探索。之后分批增加训练样本：约 50% 高预测分、25% 分类边界、25% 随机，排除验证和已标注 ID。
   高分部分用来补充稀少正例，随机部分避免只追逐模型已知模式；不要只在很低的召回阈值附近挑负例。有预算且验证仍不可靠时继续迭代。
-- 优先试 unstructured 的已有向量：L2 归一化 + class_weight='balanced' 的 L2 LogisticRegression（C=1）。聚类效果差不代表监督分类无效。
-  中文字符 TF-IDF（analyzer='char', max_features 有上限）可作对照；只用训练标签拟合。批量读库并缓存特征，避免对全库循环发数万次 SQL。
+- 主 proxy 优先使用 `okagent.qwen_proxy.load_qwen_features` 的 Qwen3-Embedding-0.6B CPU 语义向量；这是特征提取器，不得把 Qwen 当标签 oracle。
+  该函数会按数据库、岗位和配置持久缓存全库向量，baseline/lo_ph/Hydra 可通过 `OKAGENT_QWEN_CACHE` 复用；先做 2 条文本冒烟测试，再批量编码。
+  默认 256 维、384 tokens，适合 CPU；不得擅自换成 4B/8B。用岗位 query cosine 作为零样本先验，并在 Qwen 向量上训练带正则的 balanced LR；
+  可与 L2 归一化的已有 unstructured/分段均值向量分数做验证集选权重的 ensemble。模型下载或依赖确实失败时才回退已有向量，并在 report 明确原因。
+  中文字符 TF-IDF（analyzer='char', max_features 有上限）只作低成本对照；只用训练标签拟合。批量读库并缓存特征，避免对全库循环发数万次 SQL。
 - 每轮检查正例数和独立验证指标。阈值选满足 recall>=0.9 的最大值，不能选 PR 曲线第一个满足项：
   p,r,t=precision_recall_curve(y_val,scores); eligible=np.flatnonzero(r[:-1]>=0.9); threshold=float(t[eligible[-1]])。
   仅在验证含正例且 t 非空时使用；零正例不能估计 recall，少量正例需说明阈值不稳定。不要把调参集指标当作独立测试或统计保证。
@@ -25,6 +28,7 @@ PROXY_SKILL = """## 稀少正例 proxy 实验要点
 - 续跑时验证样本以完整的 ID 文件为准，不能把已标注子集当成完整验证集；先补齐缺失标签。每轮训练合并此前所有训练标签，排除整个验证池。
 - 验证指标必须用缓存覆盖前的 proxy 分数计算；覆盖后的验证预测等于已知答案，不能用于评估模型。最终报告重新计算指标，保存完整精度阈值，不从文字摘要抄四舍五入的阈值。
 - 训练、采样、验证、部署复用同一特征函数；不能在任意首个分段、unstructured 和全部分段均值之间混用。固定验证只有少数正例时，不能以训练正例达到某个数量或固定轮数为由提前停止；继续分批使用剩余预算，耗尽后如实报告召回的不确定性。
+- Qwen、已有 embedding 或 ensemble 的选择只能依据实时训练/验证标签，不能读取历史 llm_pass；保存 backend、模型名、截断长度、维度、cache 路径和 ensemble 权重，确保部署可复现。
 """
 
 

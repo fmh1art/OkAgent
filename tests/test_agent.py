@@ -226,15 +226,17 @@ def test_model_format_tolerance_and_failed_token_record(run, llm):
     llm[1].extend([
         (200, '```json\n{"candidate_id":"a","is_match":{"result":true},"reason":"line one\nline two"}\n```'),
         (200, '{bad JSON'),
+        judgment('b', 0),
     ])
     op = SemanticOperator(run / 'workspace')
     assert op.label('a') == 1
-    with pytest.raises(ValueError):
-        op.label('b')
+    assert op.label('b') == 0
     with sqlite3.connect(op.state) as con:
-        label, response = con.execute("SELECT label,response FROM queries WHERE candidate_id='b'").fetchone()
+        rows = con.execute("SELECT label,response FROM queries WHERE candidate_id='b' ORDER BY call_id").fetchall()
+    label, response = rows[0]
     assert label is None and json.loads(response)['_usage']['total_tokens'] == 2
-    assert op.usage()['llm_calls'] == 2
+    assert [row[0] for row in rows] == [None, 0]
+    assert op.usage()['llm_calls'] == 3
 
 
 def test_optional_endpoint_pacing_applies_to_parallel_requests(run, llm, monkeypatch, tmp_path):

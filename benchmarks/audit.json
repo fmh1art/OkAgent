@@ -54,7 +54,11 @@
       "fn": 0,
       "precision": 0.16,
       "recall": 1.0
-    }
+    },
+    "actual_training_count": 947,
+    "actual_training_positive": 96,
+    "training_validation_sample_overlap": 0,
+    "training_validation_pool_overlap": 122
   },
   {
     "round": "r3",
@@ -74,5 +78,75 @@
       "precision": 0.04807692307692308,
       "recall": 1.0
     }
+  },
+  {
+    "round": "r4",
+    "method": "baseline",
+    "job": "job01",
+    "validation_pool_size": 400,
+    "validation_labeled": 400,
+    "validation_positive": 6,
+    "training_cached": 1529,
+    "training_positive": 207,
+    "feature": "unstructured",
+    "normalize_input": true,
+    "model_artifact": "output/proxy.pkl",
+    "threshold": 0.19549370153153314,
+    "largest_qualifying_threshold": 0.19549370153153314,
+    "proxy_validation_before_override": {
+      "tp": 6,
+      "fp": 78,
+      "fn": 0,
+      "precision": 0.07142857142857142,
+      "recall": 1.0
+    }
+  },
+  {
+    "round": "r4",
+    "method": "baseline",
+    "job": "job04",
+    "validation_pool_size": 400,
+    "validation_labeled": 400,
+    "validation_positive": 4,
+    "training_cached": 1524,
+    "training_positive": 71,
+    "feature": "unstructured",
+    "normalize_input": true,
+    "model_artifact": "output/proxy.pkl",
+    "threshold": 0.2817574588924752,
+    "largest_qualifying_threshold": 0.2817574588924762,
+    "proxy_validation_before_override": {
+      "tp": 4,
+      "fp": 40,
+      "fn": 0,
+      "precision": 0.09090909090909091,
+      "recall": 1.0
+    }
+  },
+  {
+    "round": "r5",
+    "method": "lo_ph_sampling_check",
+    "job": "job01",
+    "checks": {
+      "sample_count": 32,
+      "overlap_with_current_cache": 0,
+      "overlap_with_validation_pool": 0,
+      "new_label_attempts": 0,
+      "unknown_ids": 0
+    },
+    "elapsed_seconds": 74.79149359278381
+  },
+  {
+    "round": "r5",
+    "method": "lo_ph_sampling_check",
+    "job": "job04",
+    "checks": {
+      "sample_count": 32,
+      "overlap_with_current_cache": 0,
+      "overlap_with_validation_pool": 0,
+      "new_label_attempts": 0,
+      "unknown_ids": 0
+    },
+    "elapsed_seconds": 78.63628736697137
   }
 ]

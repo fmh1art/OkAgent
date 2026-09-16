@@ -6,7 +6,7 @@
 
 - **主项目**：准备工作区和任务 prompt，由最基础的 mini-swe-agent 编写、执行采样、标注、proxy 训练及预测代码，最后统一评估。
 - **复现方法**：`other_methods/hydra` 实现 Hydra 的主动采样、逻辑回归与 recall 阈值校准，可直接运行。
-- **CPU Qwen proxy**：三个方法可复用 Qwen3-Embedding-0.6B 的缓存语义特征；Qwen 只提取特征，不充当标签 oracle。
+- **CPU Qwen proxy**：baseline 和 LO-PH 直接以 `Qwen/Qwen3-0.6B` 因果语言模型作为 proxy，比较 A/B 类别 token logits；不是 Qwen embedding + LR。Hydra 的固定算法仍可单独选择 stored 或 Qwen embedding 后端。
 
 所有入口都是 Python 函数。code agent 只有“模型 → bash → 观察结果”的循环，逐人标注由 `SemanticOperator` 提供。
 
@@ -21,6 +21,8 @@ OkAgent/
 │   ├── prompts.py                # 简短的系统 prompt 和训练任务 prompt
 │   ├── agent.py                  # mini-swe-agent 运行入口
 │   ├── lo_ph_agent.py            # logical 函数规划 → physical 子 agent 执行
+│   ├── qwen_causal_proxy.py      # CPU 小 Qwen 本体直接进行 A/B proxy 分类
+│   ├── qwen_proxy.py             # Qwen embedding 后端，仅供 Hydra/对照实验
 │   ├── semantic.py               # 逐人 LLM 标注、预算与标签缓存
 │   └── evaluation.py             # evaluate：统一评估
 ├── other_methods/
@@ -208,7 +210,7 @@ print(result["evaluation"])
 参考的是 `OptiHarnessForCost/agent/mini-swe-agent` 的基础结构，运行时通过已安装的包调用，不依赖参考项目路径。
 组件组合方式见 [mini-swe-agent Python 用法](https://mini-swe-agent.com/latest/advanced/cookbook/)。
 
-prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → CPU Qwen3-Embedding-0.6B 缓存特征 + 加权逻辑回归/ensemble → 增量采样 → recall 优先的阈值选择 → 全库预测。
+prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → CPU Qwen3-0.6B 本体按 A/B token logits 直接评分 → 增量采样 → recall 优先的阈值选择 → 全库预测。主 proxy 禁止替换为 Qwen embedding + LR。
 同时约束类别极不均衡、单类训练、验证集无正例、采样偏差与标签覆盖预测等情况。
 Partition、Sample、Label、Proxy、Deploy 只表示代码阶段。具体训练脚本由 code agent 编写。
 

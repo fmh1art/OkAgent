@@ -1,5 +1,10 @@
 # Baseline / LO-PH / Hydra：job01 1k 子集实验报告
 
+> **已废止的实现口径（2026-09-16 更正）：** 本报告中的 baseline/Hydra 把
+> Qwen 当作 embedding 特征提取器，再训练 Logistic Regression；这不符合“小 Qwen
+> 模型本体作为 proxy model”的需求。表中结果只保留为错误实现的工程记录，不用于评价
+> 新增的 `QwenCausalProxy`。必须在新 run-dir 中重跑 baseline 和 LO-PH 后才能形成新结论。
+
 实验日期：2026-09-16  
 实验目的：在启动全量实验前，以小数据集验证 Qwen proxy、真实标注预算、三种方法的端到端流程和结果产物。
 

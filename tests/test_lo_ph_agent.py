@@ -9,7 +9,7 @@ from minisweagent.models.test_models import DeterministicModel, make_output
 
 from okagent.agent import make_model
 from okagent.data import llm_config, write_json
-from okagent.lo_ph_agent import LogicalOperators, run_lo_ph_agent
+from okagent.lo_ph_agent import CONTRACTS, PHYSICAL_PROMPT, LogicalOperators, run_lo_ph_agent
 from test_agent import judgment, llm
 
 
@@ -17,6 +17,12 @@ def tool(name, arguments):
     return {"role": "assistant", "content": "planner-only-marker" if name != "bash" else "Implement this operator",
             "tool_calls": [{"id": "test-call", "type": "function",
                             "function": {"name": name, "arguments": json.dumps(arguments)}}]}
+
+
+def test_proxy_contract_requires_the_qwen_causal_model():
+    text = CONTRACTS["proxy"] + PHYSICAL_PROMPT
+    assert "QwenCausalProxy" in text and "Qwen3-0.6B" in text
+    assert "禁止用 `qwen_proxy.load_qwen_features`" in text
 
 
 def test_native_functions_delegate_and_share_workspace(run, llm, monkeypatch):

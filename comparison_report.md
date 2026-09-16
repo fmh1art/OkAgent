@@ -233,7 +233,7 @@ uv pip install -e '.[agent,test]' -r other_methods/hydra/requirements.txt
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1
 ```
 
-按 `_config/llm.example.json` 创建本地 `_config/llm.json`，填写授权接口与 key；按 `_config/hiring.json` 设置本地 raw_root。密钥、简历、候选人 ID、轨迹和参考 zip 均未提交。详细环境说明见 [README](README.md) 和 [Hydra README](other_methods/hydra/README.md)。
+按 `_config/llm.example.json` 创建本地 `_config/llm.json`，填写授权接口与 key；按 `_config/hiring.json` 设置本地 raw_root。密钥、简历、候选人 ID、轨迹和参考 zip 均未提交到 GitHub。完整结果另存于公开数据集 [ModelScope：fmh1art/OkAgent_results](https://modelscope.cn/datasets/fmh1art/OkAgent_results)，不包含密钥、参考 zip 或软链接指向的外部数据库。详细环境说明见 [README](README.md) 和 [Hydra README](other_methods/hydra/README.md)。
 
 新实验从项目根目录以 Python 函数运行（新名称，避免覆盖已有证据）：
 
@@ -266,7 +266,7 @@ run_case('reproduce_next', 'baseline', 'job04', previous_run=old,
          validation_ids=ids, validation_sample_ids=ids)
 ```
 
-`previous_run` 必须指向自己的实际旧运行。对于 lo_ph job01，validation_ids 是整个保留池，validation_sample_ids 仅为已经冻结的 400 人样本；不能把池内其余 ID 重新划到训练。新机器没有本地 results 时，应从新实验开始；不能仅凭 Git 中的聚合表还原旧 API 响应。
+`previous_run` 必须指向自己的实际旧运行。对于 lo_ph job01，validation_ids 是整个保留池，validation_sample_ids 仅为已经冻结的 400 人样本；不能把池内其余 ID 重新划到训练。新机器可按 README 从 ModelScope 恢复完整 results，或从新实验开始；不能仅凭 Git 中的聚合表还原旧 API 响应。
 
 证据位置：
 
@@ -274,7 +274,7 @@ run_case('reproduce_next', 'baseline', 'job04', previous_run=old,
 | --- | --- |
 | 全部轮次的聚合指标、tokens、状态 | [`benchmarks/results.json`](benchmarks/results.json) |
 | 模型/验证/划分审查聚合数据 | [`benchmarks/audit.json`](benchmarks/audit.json) |
-| 原始工作区、生成代码、SQLite、完整轨迹 | `results/comparison/r0` 至 `r6`（本地，Git 忽略） |
+| 原始工作区、生成代码、SQLite、完整轨迹 | `results/comparison/r0` 至 `r6`（Git 忽略，完整目录归档于上述公开 ModelScope 数据集） |
 | R2–R6 开始时的依赖及代码哈希 | 各轮 `manifest.json` |
 | 运行中的改动与原文件 | 对应轮次 `repairs/` |
 | 原工作区恢复前的轨迹和状态 | `r4/*/previous_attempts/` |
@@ -284,6 +284,6 @@ R0/R1 的早期目录没有完整 manifest，仍保留运行元数据和源码�
 
 已验证测试涵盖真实本地 HTTP 客户端、子进程执行、并发去重/预算/缓存、失败记账、两层调用、Label 完整性、长输出截断及 Hydra 串并行等价。模拟接口测试证明这些机制的行为，质量表来自真实接口运行。
 
-复现本次函数级检查及部署修复的本地脚本为 `results/comparison/check_sampling.py` 和 `fix_deploy.py`，部署修复后的实际代码位于 `r6/lo_ph-job01/workspace/operators/deploy-d8c5e15bbe11/implementation.py`。这些依赖私有工作区的实验产物保留本地；重新运行脚本仍需审查生成代码，不能保证随机agent再次生成完全相同程序。
+复现本次函数级检查及部署修复的本地脚本为 `results/comparison/check_sampling.py` 和 `fix_deploy.py`，部署修复后的实际代码位于 `r6/lo_ph-job01/workspace/operators/deploy-d8c5e15bbe11/implementation.py`。这些依赖私有工作区的实验产物已包含在 ModelScope 归档中；重新运行脚本仍需审查生成代码，不能保证随机agent再次生成完全相同程序。
 
 最终测试：`python -m pytest tests other_methods/hydra/tests -q --tb=short`，**42 passed**，仅一个 Pydantic TypedDict ReadOnly 提示。

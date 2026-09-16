@@ -390,7 +390,7 @@ job01 full，默认配置、随机首轮、seed=42、离线 replay：
 | 34,761 | 1,431 / 2,000 | 755 | 65.71% | 33.25% |
 
 对应本地文件为 `results/hydra-job01/evaluation.json`。目标 recall 是估计目标，不保证真实全库达到；这里实际 recall 低于配置的 70%。
-版本、随机数实现与数据变化可能影响结果。`results/` 不入 Git，新环境需要自行运行生成。
+版本、随机数实现与数据变化可能影响结果。`results/` 不入 Git；已有结果可从文末的 ModelScope 归档恢复，也可自行运行生成。
 
 ## 6. 验证环境与测试
 
@@ -444,3 +444,28 @@ export()  # 将全库评估、调用量和 token 等聚合数据写入 benchmark
 ```
 
 需要换 prompt 迭代时，先保存新轮 snapshot，再传入 `previous_run`、原 `validation_ids`（整个禁止训练的验证池）以及可选的 `validation_sample_ids`（已冻结的验证样本）。它会复制原账本，总预算不会重置。报告中的 R2→R3→R4 即这种续跑；它们不是独立重复实验。
+
+## 下载完整实验结果
+
+完整 `results/` 归档位于公开数据集 [ModelScope：fmh1art/OkAgent_results](https://modelscope.cn/datasets/fmh1art/OkAgent_results)。
+
+实际文件约 **1.84 GiB**，`results.tar.gz` 约 **964 MiB**，因此继续由 `.gitignore` 排除，不放入 GitHub。归档包含全部 14,214 个实际文件和 29 个软链接，包括 R0–R6 的工作区、生成代码、模型、标签缓存、完整轨迹及修复记录；另附报告、聚合结果、逐文件 `manifest.json` 和 `SHA256SUMS`。
+
+可通过 ModelScope 网页下载，或在单独的下载环境安装 `modelscope-hub==0.4.3` 后使用：
+
+```python
+from modelscope_hub import HubApi
+
+HubApi().download_repo(
+    "fmh1art/OkAgent_results", repo_type="dataset", local_dir="OkAgent_results"
+)
+```
+
+进入下载目录，先校验，再解压到尚未包含 `results/` 的 OkAgent 项目，避免覆盖已有实验：
+
+```bash
+sha256sum -c SHA256SUMS
+tar -xzf results.tar.gz -C /path/to/OkAgent
+```
+
+归档保留软链接，不复制其指向的外部原始数据库。换机器运行前，需要准备原始数据、重建 `workspace/data.duckdb` 链接，并调整 `task.json` 和历史脚本中的本机路径。具体恢复说明见数据集 README。密钥及原始参考 zip 不在归档中。

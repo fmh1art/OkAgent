@@ -64,6 +64,20 @@ uv pip install -r other_methods/hydra/requirements.txt
 不运行 Hydra 时可省略最后一条命令；不需要测试时使用 `'.[agent]'`。
 只准备/评估数据或运行 Hydra replay 时，主包选择 `'.[test]'` 即可，Hydra 仍需安装其 `requirements.txt`；无需 agent 依赖和模型接口。
 
+baseline/LO-PH 的本地 proxy 直接运行 `Qwen/Qwen3-0.6B`：
+
+```python
+from okagent.qwen_causal_proxy import QwenCausalProxy
+
+proxy = QwenCausalProxy.from_workspace(".")
+proxy.fit(train_labels)                 # 只传训练标签，选择 few-shot demonstrations
+scores = proxy.score_ids(candidate_ids) # Qwen 本体的 A/B token logits → P(match)
+proxy.save("output/proxy.pkl", threshold=threshold)
+```
+
+服务器真实 CPU 冒烟中，模型进程峰值内存约 5.1 GiB；权重已缓存后的冷启动加两人评分约 15 秒。
+全库分数会按数据库、岗位、配置和 demonstrations 缓存到 `OKAGENT_QWEN_CAUSAL_CACHE`。
+
 ### 没有 uv 时
 
 ```bash

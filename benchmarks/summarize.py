@@ -37,6 +37,10 @@ def summarize(run):
             live_positive_gold_positive=sum(a == b == 1 for a, b in pairs),
             live_positive_gold_negative=sum(a == 1 and b == 0 for a, b in pairs),
             live_negative_gold_positive=sum(a == 0 and b == 1 for a, b in pairs))
+        if 'evaluation' in result:
+            positives = result['evaluation']['tp'] + result['evaluation']['fn']
+            forced_misses = result['label_agreement_on_queried_sample']['live_negative_gold_positive']
+            result['historical_recall_ceiling_with_cache_override'] = 1 - forced_misses / positives if positives else None
     latencies = [r['_latency_seconds'] for r in responses if '_latency_seconds' in r]
     result['label_tokens'] = tokens([r.get('_usage', {}) for r in responses])
     result['label_models'] = sorted({r['_model'] for r in responses if r.get('_model')})

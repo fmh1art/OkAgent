@@ -47,7 +47,8 @@ def summarize(run):
     if latencies:
         result['label_latency_seconds'] = dict(mean=mean(latencies), median=median(latencies), maximum=max(latencies))
     # Each trajectory contains its own agent calls; workers are separate from their planner.
-    trajectories = list(run.glob('*.trajectory.json')) + list(run.glob('workspace/operators/*/trajectory.json'))
+    trajectories = (list(run.glob('*.trajectory.json')) + list(run.glob('workspace/operators/*/trajectory.json'))
+                    + list(run.glob('previous_attempts/*/*.trajectory.json')))
     usages, models, calls = [], set(), 0
     for path in trajectories:
         trajectory = json.loads(path.read_text())

@@ -52,7 +52,7 @@ class SemanticOperator:
             raise ValueError("candidate_id must be a string")
         # Deduplicate the same person across processes without serializing independent requests.
         name = hashlib.sha256(candidate_id.encode()).hexdigest()
-        with (self.output / ".label-locks" / name).open("a") as lock, closing(sqlite3.connect(self.state)) as db:
+        with (self.output / ".label-locks" / name).open("a") as lock, closing(sqlite3.connect(self.state, timeout=30)) as db:
             fcntl.flock(lock, fcntl.LOCK_EX)
             cached = db.execute("SELECT label FROM queries WHERE candidate_id=? AND label IS NOT NULL",
                                 [candidate_id]).fetchone()
@@ -106,9 +106,7 @@ class SemanticOperator:
             metadata = dict(_usage=response.usage.model_dump() if response.usage else {},
                             _latency_seconds=time.monotonic() - started,
                             _model=response.model, _finish_reason=response.choices[0].finish_reason)
-            db.execute("UPDATE queries SET response=? WHERE call_id=?",
-                       [json.dumps(dict(_raw_response=raw, **metadata), ensure_ascii=False), call_id])
-            db.commit()  # Preserve billed usage even if the model returned invalid JSON.
+            self._record(call_id, dict(_raw_response=raw, **metadata))
             content = (raw or "").strip()
             if content.startswith("```") and content.endswith("```"):
                 content = content.split("\n", 1)[-1].rsplit("```", 1)[0]
@@ -119,10 +117,16 @@ class SemanticOperator:
                 raise ValueError("Expected the requested candidate_id and a boolean is_match.result")
             label = int(result["is_match"]["result"])
             result.update(metadata)
-            db.execute("UPDATE queries SET label=?,response=? WHERE call_id=?",
-                       [label, json.dumps(result, ensure_ascii=False), call_id])
-            db.commit()
+            self._record(call_id, result, label)
             return label
+
+    def _record(self, call_id, response, label=None):
+        # All writes share the short budget lock; no lock spans a network request.
+        with (self.output / "semantic.lock").open("a") as lock, closing(sqlite3.connect(self.state, timeout=30)) as db:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            db.execute("UPDATE queries SET label=?,response=? WHERE call_id=?",
+                       [label, json.dumps(response, ensure_ascii=False), call_id])
+            db.commit()  # Preserve usage even for invalid model output.
 
     def cached_labels(self):
         """Read successful labels without issuing requests or spending budget."""

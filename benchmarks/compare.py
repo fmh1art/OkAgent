@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import traceback
+from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,17 +46,20 @@ def run_case(round_name, method, job="job01", *, resume=False, previous_run=None
     run = directory / f"{method}-{job}"
     previous = None
     if resume:
-        if method != "hydra":
-            raise ValueError("Resume is only needed for the deterministic Hydra runner")
+        if previous_run is not None:
+            raise ValueError("Use resume or previous_run, not both")
         previous = json.loads((run / "experiment.json").read_text())
-        (run / "previous_attempt.json").write_text(json.dumps(previous, indent=2))
-        shutil.copyfile(run / "error.txt", run / "previous_error.txt")
+        archive = run / "previous_attempts" / str(time.time_ns())
+        archive.mkdir(parents=True)
+        for path in [run / "experiment.json", run / "error.txt", *run.glob("*.trajectory.json")]:
+            if path.exists():
+                shutil.move(path, archive / path.name)
     else:
         prepare(directory / "hiring.json", run, job=job)
-    initial_calls = 0
+    initial_calls = previous.get("initial_calls", 0) if previous else 0
     if previous_run is not None:
         old = Path(previous_run) / "workspace/output/semantic.sqlite"
-        with sqlite3.connect(old) as source, sqlite3.connect(run / "workspace/output/semantic.sqlite") as destination:
+        with closing(sqlite3.connect(old)) as source, closing(sqlite3.connect(run / "workspace/output/semantic.sqlite")) as destination:
             source.backup(destination)
             initial_calls = source.execute("SELECT count(*) FROM queries").fetchone()[0]
             labels = dict(source.execute("SELECT candidate_id,label FROM queries WHERE label IS NOT NULL"))
@@ -85,7 +89,7 @@ def run_case(round_name, method, job="job01", *, resume=False, previous_run=None
     metadata = dict(round=round_name, method=method, job=job,
                     source_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip(),
                     started_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), status="running")
-    metadata.update(initial_calls=initial_calls, previous_run=str(previous_run) if previous_run else None,
+    metadata.update(initial_calls=initial_calls, previous_run=str(previous_run) if previous_run else (previous or {}).get("previous_run"),
                     command_timeout=7200)
     write_json(run / "experiment.json", metadata)
     started = time.monotonic()

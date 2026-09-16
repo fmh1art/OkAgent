@@ -1,0 +1,78 @@
+[
+  {
+    "round": "r3",
+    "method": "baseline",
+    "job": "job01",
+    "validation_pool_size": 400,
+    "validation_labeled": 400,
+    "validation_positive": 6,
+    "training_cached": 1529,
+    "training_positive": 207,
+    "threshold": 0.19549289206014087,
+    "largest_qualifying_threshold": 0.19549289206014087,
+    "proxy_validation_before_override": {
+      "tp": 6,
+      "fp": 78,
+      "fn": 0,
+      "precision": 0.07142857142857142,
+      "recall": 1.0
+    }
+  },
+  {
+    "round": "r3",
+    "method": "baseline",
+    "job": "job04",
+    "validation_pool_size": 400,
+    "validation_labeled": 240,
+    "validation_positive": 3,
+    "training_cached": 1198,
+    "training_positive": 51,
+    "threshold": 0.34662952634028366,
+    "largest_qualifying_threshold": 0.34662952634028366,
+    "proxy_validation_before_override": {
+      "tp": 3,
+      "fp": 16,
+      "fn": 0,
+      "precision": 0.15789473684210525,
+      "recall": 1.0
+    }
+  },
+  {
+    "round": "r3",
+    "method": "lo_ph",
+    "job": "job01",
+    "validation_pool_size": 6953,
+    "validation_labeled": 400,
+    "validation_positive": 4,
+    "training_cached": 825,
+    "training_positive": 79,
+    "threshold": 0.4397,
+    "largest_qualifying_threshold": 0.4397163596771684,
+    "proxy_validation_before_override": {
+      "tp": 4,
+      "fp": 21,
+      "fn": 0,
+      "precision": 0.16,
+      "recall": 1.0
+    }
+  },
+  {
+    "round": "r3",
+    "method": "lo_ph",
+    "job": "job04",
+    "validation_pool_size": 400,
+    "validation_labeled": 400,
+    "validation_positive": 5,
+    "training_cached": 938,
+    "training_positive": 35,
+    "threshold": 0.23220391513241811,
+    "largest_qualifying_threshold": 0.23220391513241811,
+    "proxy_validation_before_override": {
+      "tp": 5,
+      "fp": 99,
+      "fn": 0,
+      "precision": 0.04807692307692308,
+      "recall": 1.0
+    }
+  }
+]

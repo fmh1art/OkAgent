@@ -17,9 +17,9 @@ import numpy as np
 class QwenFeatureConfig:
     model_name: str = "Qwen/Qwen3-Embedding-0.6B"
     dimensions: int = 256
-    max_seq_length: int = 384
-    max_chars: int = 2400
-    batch_size: int = 16
+    max_seq_length: int = 128
+    max_chars: int = 1000
+    batch_size: int = 32
 
     def validate(self):
         for name in ("dimensions", "max_seq_length", "max_chars", "batch_size"):
@@ -50,7 +50,7 @@ def _compact_resume(parts, max_chars):
     return result[:max_chars]
 
 
-def load_resume_texts(database, max_chars=2400):
+def load_resume_texts(database, max_chars=1000):
     """Return stable candidate IDs and compact, section-balanced resume text."""
     grouped = {}
     with duckdb.connect(str(database), read_only=True) as con:

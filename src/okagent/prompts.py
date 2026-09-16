@@ -18,7 +18,7 @@ PROXY_SKILL = """## 稀少正例 proxy 实验要点
   高分部分用来补充稀少正例，随机部分避免只追逐模型已知模式；不要只在很低的召回阈值附近挑负例。有预算且验证仍不可靠时继续迭代。
 - 主 proxy 优先使用 `okagent.qwen_proxy.load_qwen_features` 的 Qwen3-Embedding-0.6B CPU 语义向量；这是特征提取器，不得把 Qwen 当标签 oracle。
   该函数会按数据库、岗位和配置持久缓存全库向量，baseline/lo_ph/Hydra 可通过 `OKAGENT_QWEN_CACHE` 复用；先做 2 条文本冒烟测试，再批量编码。
-  默认 256 维、384 tokens，适合 CPU；不得擅自换成 4B/8B。用岗位 query cosine 作为零样本先验，并在 Qwen 向量上训练带正则的 balanced LR；
+  默认 256 维、128 tokens，并按分段均衡保留文本，适合 CPU；不得擅自换成 4B/8B。用岗位 query cosine 作为零样本先验，并在 Qwen 向量上训练带正则的 balanced LR；
   可与 L2 归一化的已有 unstructured/分段均值向量分数做验证集选权重的 ensemble。模型下载或依赖确实失败时才回退已有向量，并在 report 明确原因。
   中文字符 TF-IDF（analyzer='char', max_features 有上限）只作低成本对照；只用训练标签拟合。批量读库并缓存特征，避免对全库循环发数万次 SQL。
 - 每轮检查正例数和独立验证指标。阈值选满足 recall>=0.9 的最大值，不能选 PR 曲线第一个满足项：

@@ -320,7 +320,7 @@ Label 提交时检查完整 ID 覆盖和成功缓存中的标签；模型、特�
 NumPy/SciPy 替代原模型实现，DuckDB 和 Python 回调替代内部运行依赖。
 
 优化后的 CPU 招聘配置可用 `Config.hiring_cpu(max_calls=2000)`；配合
-`run_hiring(..., feature_backend="qwen")` 使用 256 维 Qwen 语义特征和岗位 query 初始化，
+`run_hiring(..., feature_backend="qwen")` 使用 256 维、128-token、按简历分段均衡保留文本的 Qwen 语义特征和岗位 query 初始化，
 并启用正则化、更大的训练/校准预算。默认 `Config()` 和 `feature_backend="stored"` 仍保留，便于复现旧结果。
 
 统一的全量实验入口为：

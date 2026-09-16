@@ -45,6 +45,7 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
 Proxy 优先将 Normalizer/特征变换与分类器保存为 sklearn Pipeline；若读取 pickle 字典，Sample/Deploy 必须应用其中声明的变换，不能只取 model 后直接预测原始向量。先用少量数据验证模型接口和变换，再跑全库。
 主动采样从 SemanticOperator('.').cached_labels() 的键排除全部已标注 ID，不能只用启动时的训练文件；读取行数组时提取 row['candidate_id']，不能把整个字典转成字符串当 ID。
+Deploy 用同一个特征函数处理验证 ID 和全库 ID；若训练取全部分段均值，验证也必须取均值，禁止用 LIMIT 1 替代。自检同一 ID 在两条路径中的向量和分数一致。
 result.json 的 summary 必须为字符串；统计对象另存文件。table.json 必须用 json.dump(rows, f) 保存一个 JSON 数组，禁止 JSONL。
 Label 必须覆盖全部输入 ID；失败后可复用缓存补齐，不能把部分标注表当作成功结果。无法补齐时明确失败。
 提交前实际 json.load 所有 JSON 产物，assert isinstance(result['summary'], str)，检查输入 ID 和输出 ID 完全一致（采样/部署按各自契约）。

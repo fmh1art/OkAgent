@@ -205,13 +205,13 @@
       "maximum": 12.831588389351964
     },
     "agent_calls": 13,
-    "agent_calls_with_recorded_usage": 8,
+    "agent_calls_with_recorded_usage": 13,
     "agent_tokens": {
-      "prompt_tokens": 57412,
-      "completion_tokens": 7822,
-      "total_tokens": 65234,
+      "prompt_tokens": 128637,
+      "completion_tokens": 28473,
+      "total_tokens": 157110,
       "cached_tokens": 0,
-      "reasoning_tokens": 665
+      "reasoning_tokens": 841
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -480,13 +480,13 @@
       "maximum": 10.979841148480773
     },
     "agent_calls": 58,
-    "agent_calls_with_recorded_usage": 56,
+    "agent_calls_with_recorded_usage": 58,
     "agent_tokens": {
-      "prompt_tokens": 201755,
-      "completion_tokens": 18958,
-      "total_tokens": 220713,
-      "cached_tokens": 20504,
-      "reasoning_tokens": 7786
+      "prompt_tokens": 212089,
+      "completion_tokens": 19134,
+      "total_tokens": 231223,
+      "cached_tokens": 25424,
+      "reasoning_tokens": 7938
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -535,13 +535,13 @@
       "maximum": 73.46162197180092
     },
     "agent_calls": 14,
-    "agent_calls_with_recorded_usage": 11,
+    "agent_calls_with_recorded_usage": 14,
     "agent_tokens": {
-      "prompt_tokens": 88866,
-      "completion_tokens": 5857,
-      "total_tokens": 94723,
+      "prompt_tokens": 121023,
+      "completion_tokens": 18468,
+      "total_tokens": 139491,
       "cached_tokens": 0,
-      "reasoning_tokens": 938
+      "reasoning_tokens": 1264
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -590,13 +590,13 @@
       "maximum": 10.33312845788896
     },
     "agent_calls": 16,
-    "agent_calls_with_recorded_usage": 15,
+    "agent_calls_with_recorded_usage": 16,
     "agent_tokens": {
-      "prompt_tokens": 141965,
-      "completion_tokens": 9976,
-      "total_tokens": 151941,
+      "prompt_tokens": 152724,
+      "completion_tokens": 14173,
+      "total_tokens": 166897,
       "cached_tokens": 7480,
-      "reasoning_tokens": 919
+      "reasoning_tokens": 1021
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -888,13 +888,13 @@
       "maximum": 11.915563512593508
     },
     "agent_calls": 34,
-    "agent_calls_with_recorded_usage": 33,
+    "agent_calls_with_recorded_usage": 34,
     "agent_tokens": {
-      "prompt_tokens": 188546,
-      "completion_tokens": 16836,
-      "total_tokens": 205382,
-      "cached_tokens": 10976,
-      "reasoning_tokens": 6895
+      "prompt_tokens": 192570,
+      "completion_tokens": 16869,
+      "total_tokens": 209439,
+      "cached_tokens": 14360,
+      "reasoning_tokens": 6916
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -1119,13 +1119,13 @@
       "maximum": 16.55318303219974
     },
     "agent_calls": 94,
-    "agent_calls_with_recorded_usage": 90,
+    "agent_calls_with_recorded_usage": 94,
     "agent_tokens": {
-      "prompt_tokens": 637316,
-      "completion_tokens": 54408,
-      "total_tokens": 691724,
-      "cached_tokens": 50824,
-      "reasoning_tokens": 17285
+      "prompt_tokens": 669888,
+      "completion_tokens": 54729,
+      "total_tokens": 724617,
+      "cached_tokens": 59640,
+      "reasoning_tokens": 17404
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"
@@ -1196,13 +1196,496 @@
       "maximum": 11.915563512593508
     },
     "agent_calls": 128,
-    "agent_calls_with_recorded_usage": 123,
+    "agent_calls_with_recorded_usage": 128,
     "agent_tokens": {
-      "prompt_tokens": 1004707,
-      "completion_tokens": 66902,
-      "total_tokens": 1071609,
+      "prompt_tokens": 1043764,
+      "completion_tokens": 67111,
+      "total_tokens": 1110875,
       "cached_tokens": 85888,
-      "reasoning_tokens": 17662
+      "reasoning_tokens": 17811
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r4",
+    "method": "baseline",
+    "job": "job01",
+    "source_commit": "bcd3b6fce5ad7722c7cedb9b59f44ff647fae01b",
+    "started_at": "2026-09-16T01:58:29Z",
+    "status": "complete",
+    "initial_calls": 2000,
+    "previous_run": "results/comparison/r3/baseline-job01",
+    "command_timeout": 7200,
+    "elapsed_seconds": 508.1505338232964,
+    "previous_attempt": {
+      "round": "r4",
+      "method": "baseline",
+      "job": "job01",
+      "source_commit": "e8c8a2b702f529fab2c8e6e2a38759787080ed70",
+      "started_at": "2026-09-16T01:49:39Z",
+      "status": "failed",
+      "initial_calls": 2000,
+      "previous_run": "results/comparison/r3/baseline-job01",
+      "command_timeout": 7200,
+      "error_type": "BadRequestError",
+      "error": "litellm.BadRequestError: OpenAIException - Total tokens of image and text exceed max message tokens. Request id: 0217895238257123906a72ab000b5ec26f7911656631d35581bff",
+      "elapsed_seconds": 447.210985025391
+    },
+    "resumed_from_cache": true,
+    "evaluation": {
+      "job": "job01",
+      "candidate_count": 34761,
+      "selected_count": 6879,
+      "evaluated_count": 34761,
+      "unknown_gold_count": 0,
+      "tp": 302,
+      "fp": 6577,
+      "fn": 80,
+      "tn": 27802,
+      "recall": 0.7905759162303665,
+      "precision": 0.043901729902602125,
+      "f1": 0.083184134416747,
+      "llm_calls": 2000,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "semantic_operator"
+    },
+    "label_attempts": 2000,
+    "successful_labels": 1929,
+    "positive_labels": 213,
+    "unfinished_or_failed_labels": 71,
+    "new_label_attempts": 0,
+    "new_label_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1929,
+      "agree": 1802,
+      "live_positive_gold_positive": 153,
+      "live_positive_gold_negative": 60,
+      "live_negative_gold_positive": 67
+    },
+    "historical_recall_ceiling_with_cache_override": 0.824607329842932,
+    "label_tokens": {
+      "prompt_tokens": 14801999,
+      "completion_tokens": 174890,
+      "total_tokens": 14976889,
+      "cached_tokens": 6671288,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 3.015776001574759,
+      "median": 1.9430587440729141,
+      "maximum": 73.46162197180092
+    },
+    "agent_calls": 18,
+    "agent_calls_with_recorded_usage": 17,
+    "agent_tokens": {
+      "prompt_tokens": 99991,
+      "completion_tokens": 5376,
+      "total_tokens": 105367,
+      "cached_tokens": 32280,
+      "reasoning_tokens": 743
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r4",
+    "method": "baseline",
+    "job": "job04",
+    "source_commit": "06ee733c4815f8da2a50f651548f91b525e0ab3c",
+    "started_at": "2026-09-16T02:10:30Z",
+    "status": "complete",
+    "initial_calls": 1477,
+    "previous_run": "results/comparison/r3/baseline-job04",
+    "command_timeout": 7200,
+    "elapsed_seconds": 1207.907381015912,
+    "previous_attempt": {
+      "round": "r4",
+      "method": "baseline",
+      "job": "job04",
+      "source_commit": "8636ebee775cea254b63e77343af26322d60d412",
+      "started_at": "2026-09-16T01:56:24Z",
+      "status": "complete",
+      "initial_calls": 1477,
+      "previous_run": "results/comparison/r3/baseline-job04",
+      "command_timeout": 7200,
+      "elapsed_seconds": 1086.1702788985226,
+      "previous_attempt": {
+        "round": "r4",
+        "method": "baseline",
+        "job": "job04",
+        "source_commit": "e8c8a2b702f529fab2c8e6e2a38759787080ed70",
+        "started_at": "2026-09-16T01:49:39Z",
+        "status": "interrupted_process_exit",
+        "initial_calls": 1477,
+        "previous_run": "results/comparison/r3/baseline-job04",
+        "command_timeout": 7200,
+        "ended_at": "2026-09-16T01:56:11.795794+00:00",
+        "elapsed_seconds": 392.795794,
+        "reason": "SQLite write timed out; parent process subsequently disappeared. Last saved action inspected open DB handles. Cause of process exit is not recorded."
+      },
+      "resumed_from_cache": true
+    },
+    "resumed_from_cache": true,
+    "evaluation": {
+      "job": "job04",
+      "candidate_count": 18183,
+      "selected_count": 1500,
+      "evaluated_count": 18183,
+      "unknown_gold_count": 0,
+      "tp": 152,
+      "fp": 1348,
+      "fn": 176,
+      "tn": 16507,
+      "recall": 0.4634146341463415,
+      "precision": 0.10133333333333333,
+      "f1": 0.16630196936542668,
+      "llm_calls": 1965,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "semantic_operator"
+    },
+    "label_attempts": 1965,
+    "successful_labels": 1924,
+    "positive_labels": 75,
+    "unfinished_or_failed_labels": 41,
+    "new_label_attempts": 488,
+    "new_label_tokens": {
+      "prompt_tokens": 4097558,
+      "completion_tokens": 15552,
+      "total_tokens": 4113110,
+      "cached_tokens": 1262616,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1924,
+      "agree": 1815,
+      "live_positive_gold_positive": 41,
+      "live_positive_gold_negative": 34,
+      "live_negative_gold_positive": 75
+    },
+    "historical_recall_ceiling_with_cache_override": 0.7713414634146342,
+    "label_tokens": {
+      "prompt_tokens": 16093463,
+      "completion_tokens": 93133,
+      "total_tokens": 16186596,
+      "cached_tokens": 6209512,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 2.2943791976464647,
+      "median": 1.9967047702521086,
+      "maximum": 10.33312845788896
+    },
+    "agent_calls": 37,
+    "agent_calls_with_recorded_usage": 37,
+    "agent_tokens": {
+      "prompt_tokens": 302414,
+      "completion_tokens": 13172,
+      "total_tokens": 315586,
+      "cached_tokens": 31056,
+      "reasoning_tokens": 2672
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r4",
+    "method": "lo_ph",
+    "job": "job01",
+    "source_commit": "e8c8a2b702f529fab2c8e6e2a38759787080ed70",
+    "started_at": "2026-09-16T01:49:39Z",
+    "status": "complete",
+    "initial_calls": 1387,
+    "previous_run": "results/comparison/r3/lo_ph-job01",
+    "command_timeout": 7200,
+    "elapsed_seconds": 2309.1558044701815,
+    "evaluation": {
+      "job": "job01",
+      "candidate_count": 34761,
+      "selected_count": 32886,
+      "evaluated_count": 34761,
+      "unknown_gold_count": 0,
+      "tp": 329,
+      "fp": 32557,
+      "fn": 53,
+      "tn": 1822,
+      "recall": 0.8612565445026178,
+      "precision": 0.010004257130693913,
+      "f1": 0.019778766382108934,
+      "llm_calls": 1917,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "semantic_operator"
+    },
+    "label_attempts": 1917,
+    "successful_labels": 1877,
+    "positive_labels": 170,
+    "unfinished_or_failed_labels": 40,
+    "new_label_attempts": 530,
+    "new_label_tokens": {
+      "prompt_tokens": 4567853,
+      "completion_tokens": 16960,
+      "total_tokens": 4584813,
+      "cached_tokens": 1705424,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1877,
+      "agree": 1767,
+      "live_positive_gold_positive": 113,
+      "live_positive_gold_negative": 57,
+      "live_negative_gold_positive": 53
+    },
+    "historical_recall_ceiling_with_cache_override": 0.8612565445026178,
+    "label_tokens": {
+      "prompt_tokens": 14807740,
+      "completion_tokens": 128653,
+      "total_tokens": 14936393,
+      "cached_tokens": 6242728,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 2.5577596740575936,
+      "median": 2.0070553654804826,
+      "maximum": 16.55318303219974
+    },
+    "agent_calls": 75,
+    "agent_calls_with_recorded_usage": 75,
+    "agent_tokens": {
+      "prompt_tokens": 512986,
+      "completion_tokens": 42272,
+      "total_tokens": 555258,
+      "cached_tokens": 51536,
+      "reasoning_tokens": 13078
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r4",
+    "method": "lo_ph",
+    "job": "job04",
+    "source_commit": "e8c8a2b702f529fab2c8e6e2a38759787080ed70",
+    "started_at": "2026-09-16T01:49:39Z",
+    "status": "complete",
+    "initial_calls": 1362,
+    "previous_run": "results/comparison/r3/lo_ph-job04",
+    "command_timeout": 7200,
+    "elapsed_seconds": 2263.8637322653085,
+    "evaluation": {
+      "job": "job04",
+      "candidate_count": 18183,
+      "selected_count": 3439,
+      "evaluated_count": 18183,
+      "unknown_gold_count": 0,
+      "tp": 233,
+      "fp": 3206,
+      "fn": 95,
+      "tn": 14649,
+      "recall": 0.7103658536585366,
+      "precision": 0.067752253562082,
+      "f1": 0.12370586673745686,
+      "llm_calls": 1913,
+      "max_calls": 2000,
+      "within_budget": true,
+      "usage_source": "semantic_operator"
+    },
+    "label_attempts": 1913,
+    "successful_labels": 1889,
+    "positive_labels": 80,
+    "unfinished_or_failed_labels": 24,
+    "new_label_attempts": 551,
+    "new_label_tokens": {
+      "prompt_tokens": 5191520,
+      "completion_tokens": 17632,
+      "total_tokens": 5209152,
+      "cached_tokens": 1725728,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1889,
+      "agree": 1783,
+      "live_positive_gold_positive": 38,
+      "live_positive_gold_negative": 42,
+      "live_negative_gold_positive": 64
+    },
+    "historical_recall_ceiling_with_cache_override": 0.8048780487804879,
+    "label_tokens": {
+      "prompt_tokens": 15980967,
+      "completion_tokens": 83311,
+      "total_tokens": 16064278,
+      "cached_tokens": 6299632,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 2.215434483832642,
+      "median": 1.9921553879976273,
+      "maximum": 11.915563512593508
+    },
+    "agent_calls": 96,
+    "agent_calls_with_recorded_usage": 96,
+    "agent_tokens": {
+      "prompt_tokens": 643363,
+      "completion_tokens": 47807,
+      "total_tokens": 691170,
+      "cached_tokens": 85064,
+      "reasoning_tokens": 13657
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r5",
+    "method": "lo_ph_sampling_check",
+    "job": "job01",
+    "status": "complete",
+    "initial_calls": 1917,
+    "previous_run": "/data00/home/fanmeihao/projects/OkAgent/results/comparison/r4/lo_ph-job01",
+    "source_commit": "43cea16c136cb7d863ebeded965a73e79bfe27fb",
+    "started_at": "2026-09-16T02:25:19Z",
+    "kind": "function-level audit, no additional candidate labels",
+    "checks": {
+      "sample_count": 32,
+      "overlap_with_current_cache": 0,
+      "overlap_with_validation_pool": 0,
+      "new_label_attempts": 0,
+      "unknown_ids": 0
+    },
+    "artifact": "operators/sample-74cc6bcbc139/sampled_ids.json",
+    "elapsed_seconds": 74.79149359278381,
+    "label_attempts": 1917,
+    "successful_labels": 1877,
+    "positive_labels": 170,
+    "unfinished_or_failed_labels": 40,
+    "new_label_attempts": 0,
+    "new_label_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1877,
+      "agree": 1767,
+      "live_positive_gold_positive": 113,
+      "live_positive_gold_negative": 57,
+      "live_negative_gold_positive": 53
+    },
+    "label_tokens": {
+      "prompt_tokens": 14807740,
+      "completion_tokens": 128653,
+      "total_tokens": 14936393,
+      "cached_tokens": 6242728,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 2.5577596740575936,
+      "median": 2.0070553654804826,
+      "maximum": 16.55318303219974
+    },
+    "agent_calls": 5,
+    "agent_calls_with_recorded_usage": 5,
+    "agent_tokens": {
+      "prompt_tokens": 22317,
+      "completion_tokens": 2889,
+      "total_tokens": 25206,
+      "cached_tokens": 0,
+      "reasoning_tokens": 987
+    },
+    "agent_models": [
+      "doubao-seed-2-0-lite-260215"
+    ]
+  },
+  {
+    "round": "r5",
+    "method": "lo_ph_sampling_check",
+    "job": "job04",
+    "status": "complete",
+    "initial_calls": 1913,
+    "previous_run": "/data00/home/fanmeihao/projects/OkAgent/results/comparison/r4/lo_ph-job04",
+    "source_commit": "43cea16c136cb7d863ebeded965a73e79bfe27fb",
+    "started_at": "2026-09-16T02:25:19Z",
+    "kind": "function-level audit, no additional candidate labels",
+    "checks": {
+      "sample_count": 32,
+      "overlap_with_current_cache": 0,
+      "overlap_with_validation_pool": 0,
+      "new_label_attempts": 0,
+      "unknown_ids": 0
+    },
+    "artifact": "operators/sample-b39529f642ca/table.json",
+    "elapsed_seconds": 78.63628736697137,
+    "label_attempts": 1913,
+    "successful_labels": 1889,
+    "positive_labels": 80,
+    "unfinished_or_failed_labels": 24,
+    "new_label_attempts": 0,
+    "new_label_tokens": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "label_agreement_on_queried_sample": {
+      "n": 1889,
+      "agree": 1783,
+      "live_positive_gold_positive": 38,
+      "live_positive_gold_negative": 42,
+      "live_negative_gold_positive": 64
+    },
+    "label_tokens": {
+      "prompt_tokens": 15980967,
+      "completion_tokens": 83311,
+      "total_tokens": 16064278,
+      "cached_tokens": 6299632,
+      "reasoning_tokens": 0
+    },
+    "label_models": [
+      "doubao-seed-2-0-lite-260215"
+    ],
+    "label_latency_seconds": {
+      "mean": 2.215434483832642,
+      "median": 1.9921553879976273,
+      "maximum": 11.915563512593508
+    },
+    "agent_calls": 6,
+    "agent_calls_with_recorded_usage": 6,
+    "agent_tokens": {
+      "prompt_tokens": 27911,
+      "completion_tokens": 3448,
+      "total_tokens": 31359,
+      "cached_tokens": 4920,
+      "reasoning_tokens": 1766
     },
     "agent_models": [
       "doubao-seed-2-0-lite-260215"

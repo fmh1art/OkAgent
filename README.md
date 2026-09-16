@@ -259,6 +259,7 @@ agent 在工作区保存可重跑的 `pipeline.py`，并在 `workspace/output/` 
 | `semantic.sqlite` | 标注器自动记录每次尝试及成功的原始 JSON 判断 |
 
 code agent 的编写和执行轨迹保存在工作区外的 `agent.trajectory.json`，其中模型调用数独立统计。
+过长的命令输出只将首尾各 10,000 字符传给模型，完整输出留在轨迹中，避免单行 JSON 撑满上下文。
 
 ### 评估结果
 
@@ -304,6 +305,7 @@ labels = ops.label({"table": sample["artifacts"]["table"]}, "逐人标注这 100
 每个函数接收 `inputs`（输入名称到工作区文件路径的映射）和 `instruction`（方法及参数），返回产物路径、摘要和剩余预算。
 实现代码、产物和独立 trajectory 保存到 `workspace/operators/<算子>-<调用ID>/`；这里只是产物目录，执行 cwd 仍是共享 workspace。
 规划轨迹保存为 `logical.trajectory.json`。实现失败会返回规划 agent 修正；最终 `finish` 提交已完成 deploy 的结果，再统一评估。
+Label 提交时检查完整 ID 覆盖和成功缓存中的标签；模型、特征与阈值保存在对应 `operators/` 产物中。
 `step_limit` 默认 40 个规划轮次，`physical_step_limit` 默认每次实现 40 轮，均不计入逐人标注预算。
 可传入 `planner_model` 和 `physical_model_factory` 分别指定两层模型；默认共用 `_config/llm.json`。
 
@@ -430,3 +432,15 @@ run_case('my_comparison', 'hydra_replay', 'job01')
 ```
 
 长任务建议设置 `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1`。每个方法有独立 workspace、2,000 次预算、标签缓存和轨迹；运行前须配置本地 `_config/llm.json`。结果包含简历信息，保留在 Git 忽略的 `results/comparison/` 中。
+
+每一轮使用新的 Python 进程，避免上一轮导入的代码快照留在模块缓存中。失败后可在原工作区继续：
+
+```python
+run_case('my_comparison', 'baseline', 'job01', resume=True)
+# 同样支持 lo_ph 和 hydra；复用预算和文件，旧轨迹归档到 previous_attempts/
+
+from benchmarks.summarize import export
+export()  # 将全库评估、调用量和 token 等聚合数据写入 benchmarks/results.json
+```
+
+需要换 prompt 迭代时，先保存新轮 snapshot，再传入 `previous_run`、原 `validation_ids`（整个禁止训练的验证池）以及可选的 `validation_sample_ids`（已冻结的验证样本）。它会复制原账本，总预算不会重置。报告中的 R2→R3→R4 即这种续跑；它们不是独立重复实验。

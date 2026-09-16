@@ -43,10 +43,15 @@ def main():
         with log.open("w", encoding="utf-8") as stream:
             completed = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT,
                                        env=os.environ.copy(), check=False)
+        evaluation_path = run_dir / "evaluation.json"
+        evaluation = (json.loads(evaluation_path.read_text(encoding="utf-8"))
+                      if evaluation_path.is_file() else None)
         return dict(job=job, method=method, run_dir=str(run_dir), log=str(log),
-                    returncode=completed.returncode, seconds=time.time() - started)
+                    returncode=completed.returncode, seconds=time.time() - started,
+                    evaluation=evaluation)
 
-    manifest = dict(tag=args.tag, jobs=args.jobs, methods=args.methods,
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    manifest = dict(tag=args.tag, source_commit=commit, jobs=args.jobs, methods=args.methods,
                     max_parallel=args.max_parallel, started=time.time(), runs=[])
     manifest_path = log_dir / "manifest.json"
     with ThreadPoolExecutor(max_workers=args.max_parallel) as pool:
@@ -58,6 +63,18 @@ def main():
     manifest["finished"] = time.time()
     manifest["success"] = all(run["returncode"] == 0 for run in manifest["runs"])
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    lines = [f"# Full experiment matrix: {args.tag}", "",
+             f"Source commit: `{commit}`", "",
+             "| Job | Method | Attempts | Selected | Recall | Precision | F1 | Status |",
+             "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |"]
+    for run in sorted(manifest["runs"], key=lambda item: (item["job"], item["method"])):
+        report = run["evaluation"] or {}
+        percent = lambda value: "-" if value is None else f"{100 * value:.2f}%"
+        lines.append(f"| {run['job']} | {run['method']} | {report.get('llm_calls', '-')} | "
+                     f"{report.get('selected_count', '-')} | {percent(report.get('recall'))} | "
+                     f"{percent(report.get('precision'))} | {percent(report.get('f1'))} | "
+                     f"{'ok' if run['returncode'] == 0 else 'failed'} |")
+    (log_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
     if not manifest["success"]:
         raise SystemExit(1)

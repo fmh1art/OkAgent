@@ -46,21 +46,27 @@ PROXY_VARIANT_INSTRUCTIONS = {
 - 为避免先固定 LR 阈值导致漏召回，联合搜索时可先为全部 validation 计算 Qwen 分数；选定阈值后，全库只为 `lr_score>=t_lr` 的候选计算并缓存 Qwen 分数。不得分别校准两个阈值后直接相与。
 - `proxy.pkl` 的 backend 必须是 `lr_qwen_cascade`，保存完整 LR scaler/model、两级阈值、Qwen 模型/prompt/截断/批量配置、demonstrations 与分数缓存。报告 LR gate 的 validation recall、全库放行数量/比例、Qwen 实际评分数量、端到端指标和耗时；Deploy 必须恢复完全相同的两级流程。
 """,
-    "paper_skill": """## 本实验变体：paper_skill（以下规则替代上文默认的主动采样比例与不平衡训练规则）
-- validation 仍是固定、随机、与训练互斥的总体分布样本，绝不下采样；训练先随机 bootstrap，随后每批按 proxy 置信度分层主动学习：约 50% 预测少数类高置信样本、20% 决策边界样本、15% 特征多样性样本、15% 全库随机探索。正例极少时可提高少数类配额，但必须保留随机探索。
-- 每轮保存各采样来源的 ID、命中正例数/正例率以及训练集不平衡比 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`。只有一个类别或少数类不足 10 时继续探索，不能宣称 proxy 可靠。
-- `rho<50` 时从全部训练标签选择固定平衡 demonstrations；`rho>=50` 且少数类足够时，使用 5--10 个固定 seed 各下采样等量多数类，形成多组平衡 demonstrations，并平均各组 Qwen 概率。只按独立 validation 选择 demonstration 方案和阈值；不得下采样 validation，也不得训练 LR。
-- proxy 始终是上文的 Qwen direct。报告单组 demonstrations 与下采样多组集成各自 validation 指标，并说明采样偏差与少量正例造成的不确定性。
+    "paper_skill": """## 本实验变体：paper_skill（论文采样思想的 Qwen-direct 适配版）
+- 依据论文 arXiv:2603.15970v6 §5.4：先用 Random 冷启动；一旦两类都出现，就用当前 proxy 对全部未标注训练池评分，执行 AL（主动学习）分层采样。AL 的目标不是固定的“高分/边界/多样性”混合，而是只从当前模型预测的少数类 stratum 中取样：二分类正例稀少时按匹配概率从高到低取预测正例，负例稀少时反向取样。Top-K 只可作为对照，不能冒充 AL；不得默认使用旧的 50/20/15/15 配比。
+- 每轮 AL 标注后必须把该轮表与此前全部训练轮次按 candidate_id 去重合并为 `output/cumulative_train.json`，更新固定 demonstrations 并重新校准同一 Qwen proxy，再重算未标注池分数。proxy 调用时多个训练表必须分别放在 inputs 的 `train`、`train_round_1`、`train_round_2` 等键中，禁止把多个路径拼成一个字符串。断言累计人数和两类数量等于所有成功 label 产物的并集。
+- 固定 Random validation 与训练/AL 池互斥，保持总体原始分布，绝不平衡采样或用于 demonstrations。每轮向 `output/sampling_trace.json` 追加 strategy、候选 stratum 大小、样本 ID、命中两类数量/命中率、累计两类数量以及 `rho=多数类数/少数类数`，并比较 Random 与 AL 的少数类命中率和 rho 变化。
+- 只有一个类别时继续 Random，不能训练二分类 proxy。少数类不足 10 是本实验的保守可部署下限（不是论文给出的通用常数）：继续 Random/AL 探索；预算耗尽仍不足时保存 `proxy_valid=false` 并明确失败或回退教师 LLM，禁止部署一个“1 正例+1 负例”模型并宣称可靠。若连续两轮 AL 未提高少数类命中或未降低 rho，切回 Random 探索，避免错误 proxy 自我强化。
+- proxy 仍是上文的 Qwen direct，不训练 LR。训练标签只用于构造固定 demonstrations 和校准阈值；比较单组平衡 demonstrations 与 5--10 个固定 seed 的多数类下采样 demonstrations 集成，只能按原分布 validation 选择方案。报告少数类样本数、Random/AL 采样效率、纯 proxy 指标和缓存标签覆盖后的 hybrid 指标，二者不得混写。
+- 按论文的 Adaptive Proxy Selection 思路设部署门：validation 必须同时含两类且 proxy 达到任务质量约束；本任务要求 recall>=0.9，并在合格阈值中最大化 precision。未达标、正例过少无法稳定校准或 proxy_valid=false 时必须回退/失败，不能为了生成 candidate_ids 强行部署。
 """,
-    "paper_skill_lr": """## 本实验变体：paper_skill_lr（以下规则替代上文全部 Qwen 规则）
-- 本变体完全禁止加载或调用 Qwen/transformers/torch。唯一 proxy 使用 unstructured 2048 维已有向量，以及 `StandardScaler + LogisticRegression(class_weight='balanced', random_state=42)`；不得使用 Qwen embedding、TF-IDF 或远程模型。
-- validation 是固定、随机、与训练互斥的总体分布样本，绝不下采样。训练先随机 bootstrap，随后每批约 50% 预测少数类高置信、20% 决策边界、15% embedding 多样性、15% 全库随机探索；正例极少时可提高少数类配额，但必须保留随机探索。
-- 每轮保存各采样来源 ID、正例命中数/命中率以及 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`。单类或少数类不足 10 时继续探索，不能宣称 proxy 可靠。
-- `rho<50` 时使用全部训练标签拟合 balanced LR；`rho>=50` 且少数类足够时，同时评估多数类下采样 bagging：保留全部少数类，以 5--10 个固定 seed 各抽取等量多数类训练 LR，并平均概率。只按独立 validation 选择完整训练或 bagging，validation 不得下采样。
-- 阈值仍按端到端 validation recall>=0.9 的最大合格值选择；零正例时必须报告 recall/threshold 不可校准，禁止声称达标。`proxy.pkl` backend 必须是 `embedding_lr_paper_skill`，保存 scaler、单模型或 bagging 模型、阈值、采样轨迹和固定 seed。
+    "paper_skill_lr": """## 本实验变体：paper_skill_lr（论文轻量 proxy 复现版；以下规则替代上文全部 Qwen 规则）
+- 依据论文 arXiv:2603.15970v6 §4.2、§4.4、§5.4--5.6。完全禁止 Qwen/transformers/torch、TF-IDF 和远程 proxy；唯一 proxy 是预计算 embedding 上的 LogisticRegression。唯一合法特征为 `SELECT candidate_id, vec FROM candidate_segments WHERE segment='unstructured'` 得到的 2048 维向量；Random、AL、训练、validation、deploy 必须调用同一个特征函数并断言每个 ID 恰好一个同维向量，禁止平均所有 segment。
+- 固定 Random validation 与训练/AL 池互斥，保持总体原始分布，绝不下采样或参与训练。先从训练池 Random 冷启动；只有一个类别时继续 Random。两类都出现后，用 `StandardScaler + LogisticRegression(class_weight='balanced', random_state=42)` 拟合当前累计标签并评分全部未标注训练池。
+- 严格执行论文的 AL（主动学习）分层采样：根据当前 proxy 置信度识别预测多数类/少数类，下一批只从预测少数类 stratum 取样；本任务通常正例稀少，因此按 `P(match)` 从高到低抽取预测正例。每轮标注后把新表与所有历史训练表按 candidate_id 去重合并为 `output/cumulative_train.json`，重新拟合、重新评分再进入下一轮。Top-K 只能作为对照；决策边界/多样性混合和旧的 50/20/15/15 配比都不是本变体的默认 AL。
+- proxy 调用的多轮训练文件必须分别放在 inputs 的 `train`、`train_round_1`、`train_round_2` 等键；physical operator 必须读取所有 `train*` 输入后合并，禁止把多个路径拼成一个文件名。训练前断言累计 ID 集、样本数、正负例数与所有成功 label 表并集完全一致；任何轮次丢失都必须失败，不能退回早期模型。
+- 每轮向 `output/sampling_trace.json` 追加 strategy（random/al_minority/topk_control）、预测少数类 stratum 大小、采样 ID、真实正负例数/命中率、累计两类数量、rho_before/rho_after。比较 Random 与 AL 的少数类命中率及 rho 下降；连续两轮 AL 无改善时回到 Random 探索，避免错误模型自我强化。
+- 少数类不足 10 是本实验的保守可部署下限（不是论文给出的通用常数）：继续 Random/AL；预算耗尽仍不足时保存 `proxy_valid=false` 并回退/失败。禁止用 1 个少数类和 1 个多数类训练下采样 LR。论文指出极稀有相关项可能无法形成有意义训练集，此时正确行为是自动回退，而不是强行部署。
+- 不平衡训练以论文默认的 full weighted LR（`class_weight='balanced'`，其余参数默认）为基线。`rho>=50` 且少数类达到下限时，再同时评估多数类下采样：保留全部少数类，用 5--10 个固定 seed 分别抽取多数类；至少比较 1:1、1:3、1:5，多数类样本不足时跳过对应比例，平均各 seed 概率。可在少数类足够满足算法要求时比较 bootstrap/SMOTE，但不得用合成样本替代真实 AL 采样。只按原分布 validation 选择 full weighted 或下采样方案。
+- 阈值在原分布 validation 上选择：满足 recall>=0.9 的阈值中最大化 precision，再以较少预测正例和较高阈值打破平局。validation 为零正例或正例过少时报告不可稳定校准；无方案达标则 `proxy_valid=false`。按论文 Adaptive Proxy Selection，只有 proxy_valid=true 才部署，否则回退/失败，禁止伪称 Recall 保证。
+- 必须分别报告缓存覆盖前的纯 proxy 与覆盖后的 hybrid 指标，并报告 validation 正例数、预测正例比例、Random/AL 命中率、各训练方案指标和 embedding 缺失/维度检查。`proxy.pkl` backend 必须是 `embedding_lr_paper_skill`，保存 scaler、模型/集成、精确阈值、feature SQL/hash、累计训练 ID/标签统计、采样轨迹、固定 seeds 和 proxy_valid。
 """,
     "combined": """## 本实验变体：combined（以下规则替代上文 Qwen-only 部署，同时执行 paper_skill sampling 与 LR→Qwen cascade）
-- 使用 paper_skill：固定总体分布 validation 不下采样；随机 bootstrap 后，每批约 50% 预测少数类高置信、20% 边界、15% 多样性、15% 随机探索。记录每个来源的 ID、正例命中和 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`；单类或少数类不足 10 时继续探索。
+- 使用论文式 AL：固定总体分布 validation 不下采样；Random 冷启动后由当前 proxy 识别预测少数类，后续批次只从预测少数类 stratum 取样，每轮累计合并全部训练标签并重训。记录 strategy、stratum、样本 ID、少数类命中率和 rho_before/rho_after 到 `output/sampling_trace.json`；禁止用旧的 50/20/15/15 混合作为 AL。
 - `rho>=50` 且少数类足够时，以 5--10 个固定 seed 下采样等量多数类形成多组平衡 demonstrations，并平均各组 Qwen 概率；`rho<50` 时选择一组固定平衡 demonstrations。validation 始终保持原分布并只用于方案/阈值选择，禁止训练 LR。
 - 使用 LR→Qwen cascade：Stage 1 为已有向量 balanced LR recall gate，Stage 2 只对 gate 放行者运行 CPU Qwen3-0.6B A/B logits；LR 不得直接产生最终正例。
 - 在同一 validation 上联合搜索 `(t1,t2)`，以 `stage1_score>=t1 AND stage2_score>=t2` 计算端到端指标；在 recall>=0.9 的组合中最大化 precision，无组合达标时先最大化 recall。禁止独立校准后直接相与。

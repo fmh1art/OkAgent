@@ -45,6 +45,28 @@ def test_prepare_proxy_variants(source, tmp_path, variant, marker):
     assert json.loads((run / "task.json").read_text())["proxy_variant"] == variant
 
 
+@pytest.mark.parametrize("variant", ["paper_skill", "paper_skill_lr"])
+def test_paper_skill_uses_minority_stratified_active_learning(source, tmp_path, variant):
+    run = tmp_path / variant
+    prepare(source, run, proxy_variant=variant)
+    prompt = (run / "workspace/prompt.md").read_text(encoding="utf-8")
+    assert "AL（主动学习）" in prompt
+    assert "少数类 stratum" in prompt
+    assert "cumulative_train.json" in prompt
+    assert "禁止把多个路径拼成一个" in prompt
+    assert "proxy_valid=false" in prompt
+
+
+def test_paper_skill_lr_requires_paper_proxy_guards(source, tmp_path):
+    run = tmp_path / "paper_skill_lr"
+    prepare(source, run, proxy_variant="paper_skill_lr")
+    prompt = (run / "workspace/prompt.md").read_text(encoding="utf-8")
+    assert "WHERE segment='unstructured'" in prompt
+    assert "1:1、1:3、1:5" in prompt
+    assert "纯 proxy" in prompt
+    assert "Adaptive Proxy Selection" in prompt
+
+
 def test_unknown_proxy_variant_fails_before_creating_run(source, tmp_path):
     run = tmp_path / "unknown"
     with pytest.raises(ValueError, match="Unknown proxy_variant"):

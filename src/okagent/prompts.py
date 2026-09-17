@@ -39,11 +39,12 @@ PROXY_SKILL = """## 稀少正例 proxy 实验要点
 
 PROXY_VARIANT_INSTRUCTIONS = {
     "control": "",
-    "cascade": """## 本实验变体：cascade（以下规则替代上文的单一胜出模型部署规则）
-- 使用同一个 CPU Qwen3-0.6B 构造两级直接推理 cascade：第一级使用 recall-oriented prompt 作为宽松 gate；第二级只对第一级放行者使用 precision-oriented prompt 复核。两级都必须是 Qwen A/B logits，禁止 LR/TF-IDF。
-- 在同一独立 validation 上联合搜索 `(stage1_threshold, stage2_threshold)`，最终预测是 `stage1_score>=t1 AND stage2_score>=t2`。选择 validation recall>=0.9 的组合中 precision 最高者；无人达标时先最大化 recall、再比较 precision。禁止分别校准两个阈值后直接相与，因为那不能保持端到端 recall。
-- 必须把单阶段 Qwen 作为对照；只有 cascade 按上述端到端规则优于单阶段 Qwen 时才部署 cascade，否则部署单阶段 Qwen 并说明原因。
-- 保存两个 stage 的 backend、模型/特征、阈值和顺序；报告第一级放行数量、第二级评分数量、端到端指标、单模型对照及 CPU/Qwen 耗时。Deploy 必须严格恢复相同流程。
+    "cascade": """## 本实验变体：cascade（以下规则替代上文“Qwen 是唯一 proxy、禁止 LR”和 Qwen 全库评分规则）
+- Stage 1 使用 unstructured 2048 维已有向量训练 `StandardScaler + LogisticRegression(class_weight='balanced', random_state=42)`，快速评分全库；LR 是 recall gate，不能直接产生最终正例。
+- Stage 2 使用 CPU `Qwen/Qwen3-0.6B` 直接 A/B logits，只复核 LR gate 放行的候选；Qwen 是 precision verifier。禁止 TF-IDF、Qwen embedding + LR、远程 Qwen，以及 Qwen 对 LR gate 外候选评分。
+- 在同一独立 validation 上联合搜索 `(lr_threshold, qwen_threshold)`。端到端预测严格为 `lr_score>=t_lr AND qwen_score>=t_qwen`；在端到端 recall>=0.9 的组合中最大化 precision，precision 相同时优先 Qwen 评分人数更少、再取更高阈值。无人达标时先最大化端到端 recall，再比较 precision，禁止宣称 Recall 保证。
+- 为避免先固定 LR 阈值导致漏召回，联合搜索时可先为全部 validation 计算 Qwen 分数；选定阈值后，全库只为 `lr_score>=t_lr` 的候选计算并缓存 Qwen 分数。不得分别校准两个阈值后直接相与。
+- `proxy.pkl` 的 backend 必须是 `lr_qwen_cascade`，保存完整 LR scaler/model、两级阈值、Qwen 模型/prompt/截断/批量配置、demonstrations 与分数缓存。报告 LR gate 的 validation recall、全库放行数量/比例、Qwen 实际评分数量、端到端指标和耗时；Deploy 必须恢复完全相同的两级流程。
 """,
     "paper_skill": """## 本实验变体：paper_skill（以下规则替代上文默认的主动采样比例与不平衡训练规则）
 - validation 仍是固定、随机、与训练互斥的总体分布样本，绝不下采样；训练先随机 bootstrap，随后每批按 proxy 置信度分层主动学习：约 50% 预测少数类高置信样本、20% 决策边界样本、15% 特征多样性样本、15% 全库随机探索。正例极少时可提高少数类配额，但必须保留随机探索。
@@ -51,12 +52,12 @@ PROXY_VARIANT_INSTRUCTIONS = {
 - `rho<50` 时从全部训练标签选择固定平衡 demonstrations；`rho>=50` 且少数类足够时，使用 5--10 个固定 seed 各下采样等量多数类，形成多组平衡 demonstrations，并平均各组 Qwen 概率。只按独立 validation 选择 demonstration 方案和阈值；不得下采样 validation，也不得训练 LR。
 - proxy 始终是上文的 Qwen direct。报告单组 demonstrations 与下采样多组集成各自 validation 指标，并说明采样偏差与少量正例造成的不确定性。
 """,
-    "combined": """## 本实验变体：combined（同时执行下列采样/训练规则和 cascade 规则）
+    "combined": """## 本实验变体：combined（以下规则替代上文 Qwen-only 部署，同时执行 paper_skill sampling 与 LR→Qwen cascade）
 - 使用 paper_skill：固定总体分布 validation 不下采样；随机 bootstrap 后，每批约 50% 预测少数类高置信、20% 边界、15% 多样性、15% 随机探索。记录每个来源的 ID、正例命中和 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`；单类或少数类不足 10 时继续探索。
 - `rho>=50` 且少数类足够时，以 5--10 个固定 seed 下采样等量多数类形成多组平衡 demonstrations，并平均各组 Qwen 概率；`rho<50` 时选择一组固定平衡 demonstrations。validation 始终保持原分布并只用于方案/阈值选择，禁止训练 LR。
-- 使用 Qwen-only cascade：第一级使用 recall-oriented prompt，第二级只对第一级放行者使用 precision-oriented prompt；两级均为 CPU Qwen3-0.6B A/B logits。
+- 使用 LR→Qwen cascade：Stage 1 为已有向量 balanced LR recall gate，Stage 2 只对 gate 放行者运行 CPU Qwen3-0.6B A/B logits；LR 不得直接产生最终正例。
 - 在同一 validation 上联合搜索 `(t1,t2)`，以 `stage1_score>=t1 AND stage2_score>=t2` 计算端到端指标；在 recall>=0.9 的组合中最大化 precision，无组合达标时先最大化 recall。禁止独立校准后直接相与。
-- 与最佳单模型公平比较，cascade 仅在端到端规则下胜出才部署。保存采样轨迹、两个 stage 的完整配置/阈值、放行与评分数量、单模型对照、端到端指标和耗时；Deploy 必须恢复同一流程。
+- `proxy.pkl` backend 必须是 `lr_qwen_cascade`。保存采样轨迹、完整 LR scaler/model、两级阈值、Qwen 配置/缓存、放行与评分数量、端到端指标和耗时；Deploy 必须恢复同一流程。
 """,
 }
 

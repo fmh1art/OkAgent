@@ -33,9 +33,9 @@ def test_prepare_and_evaluate(run):
 
 
 @pytest.mark.parametrize("variant, marker", [
-    ("cascade", "联合搜索 `(stage1_threshold, stage2_threshold)`"),
+    ("cascade", "backend 必须是 `lr_qwen_cascade`"),
     ("paper_skill", "output/sampling_trace.json"),
-    ("combined", "同时执行下列采样/训练规则和 cascade 规则"),
+    ("combined", "同时执行 paper_skill sampling 与 LR→Qwen cascade"),
 ])
 def test_prepare_proxy_variants(source, tmp_path, variant, marker):
     run = tmp_path / variant

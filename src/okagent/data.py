@@ -6,7 +6,7 @@ from pathlib import Path
 
 import duckdb
 
-from .prompts import build_prompt
+from .prompts import build_prompt, proxy_variant_instruction
 
 
 def write_json(path, value):
@@ -23,7 +23,8 @@ def llm_config():
                 label_interval=float(config.get("label_interval", 0)))
 
 
-def prepare(config_path, run_dir, job=None):
+def prepare(config_path, run_dir, job=None, *, proxy_variant="control"):
+    proxy_variant_instruction(proxy_variant)
     config_path = Path(config_path).resolve()
     config = json.loads(config_path.read_text(encoding="utf-8"))
     raw = (config_path.parent / config["raw_root"]).resolve()
@@ -52,7 +53,7 @@ def prepare(config_path, run_dir, job=None):
     write_json(workspace / "settings.json", dict(as_of=config["as_of"], max_calls=config["max_calls"]))
     shutil.copyfile(raw / "llm_prompt.txt", workspace / "label_prompt.txt")
     write_json(run_dir / "task.json", dict(job=job, data=str(data), labels=str(labels),
-                                          max_calls=config["max_calls"]))
+                                          max_calls=config["max_calls"], proxy_variant=proxy_variant))
     prompt = workspace / "prompt.md"
-    prompt.write_text(build_prompt(workspace, description, count, config), encoding="utf-8")
+    prompt.write_text(build_prompt(workspace, description, count, config, proxy_variant), encoding="utf-8")
     return prompt

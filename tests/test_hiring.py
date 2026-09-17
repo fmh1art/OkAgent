@@ -29,6 +29,24 @@ def test_prepare_and_evaluate(run):
     assert json.loads((run / "evaluation.json").read_text()) == result
 
 
+@pytest.mark.parametrize("variant, marker", [
+    ("cascade", "联合搜索 `(stage1_threshold, stage2_threshold)`"),
+    ("paper_skill", "output/sampling_trace.json"),
+    ("combined", "同时执行下列采样/训练规则和 cascade 规则"),
+])
+def test_prepare_proxy_variants(source, tmp_path, variant, marker):
+    run = tmp_path / variant
+    prepare(source, run, proxy_variant=variant)
+    assert marker in (run / "workspace/prompt.md").read_text(encoding="utf-8")
+    assert json.loads((run / "task.json").read_text())["proxy_variant"] == variant
+
+
+def test_unknown_proxy_variant_fails_before_creating_run(source, tmp_path):
+    run = tmp_path / "unknown"
+    with pytest.raises(ValueError, match="Unknown proxy_variant"):
+        prepare(source, run, proxy_variant="unknown")
+
+
 @pytest.mark.parametrize("ids", [["a", "a"], ["unknown"], [123], {}])
 def test_invalid_ids(run, ids):
     output(run, ids)

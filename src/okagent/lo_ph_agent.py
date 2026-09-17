@@ -12,7 +12,7 @@ from minisweagent.models.litellm_model import LitellmModel
 from .agent import make_environment, make_model
 from .data import write_json
 from .evaluation import evaluate
-from .prompts import PROXY_SKILL, SYSTEM_PROMPT
+from .prompts import PROXY_SKILL, SYSTEM_PROMPT, proxy_variant_instruction
 from .semantic import SemanticOperator
 
 
@@ -78,7 +78,8 @@ op.usage() 返回 llm_calls/max_calls/remaining；失败计费、成功缓存复
 
 
 class LogicalOperators:
-    def __init__(self, workspace, *, model_factory=None, step_limit=40, command_timeout=1800):
+    def __init__(self, workspace, *, model_factory=None, step_limit=40, command_timeout=1800,
+                 proxy_variant="control"):
         if type(step_limit) is not int or step_limit <= 0 or command_timeout <= 0:
             raise ValueError("step_limit and command_timeout must be positive")
         self.workspace = Path(workspace).resolve()
@@ -87,6 +88,7 @@ class LogicalOperators:
         self.env = make_environment(self.workspace, command_timeout)
         self.semantic = SemanticOperator(self.workspace)
         self.completed = []
+        self.physical_prompt = PHYSICAL_PROMPT + proxy_variant_instruction(proxy_variant)
 
     def _path(self, name):
         if not isinstance(name, str) or Path(name).is_absolute() or ".." in Path(name).parts:
@@ -114,7 +116,7 @@ class LogicalOperators:
                 f"保存 {relative}/implementation.py，实际执行并自检。保存 {relative}/result.json，格式为：\n"
                 '{"artifacts": {"输出名称": "工作区相对路径"}, "summary": "方法、实际统计、自检结果及局限"}\n'
                 "所有 artifacts 必须是本次产物目录内实际生成的文件。确认成功后再提交。")
-        agent = DefaultAgent(self.model_factory(), self.env, system_template=PHYSICAL_PROMPT,
+        agent = DefaultAgent(self.model_factory(), self.env, system_template=self.physical_prompt,
                              instance_template="{{ task }}", step_limit=self.step_limit, cost_limit=0,
                              output_path=directory / "trajectory.json")
         status = agent.run(task)
@@ -241,18 +243,23 @@ class _LogicalEnvironment:
 
 
 def run_lo_ph_agent(run_dir, *, planner_model=None, physical_model_factory=None,
-                    step_limit=40, physical_step_limit=40, command_timeout=1800):
+                    step_limit=40, physical_step_limit=40, command_timeout=1800,
+                    proxy_variant="control"):
     """Plan using function calls; execute each function with a fresh physical code agent."""
     if type(step_limit) is not int or step_limit <= 0:
         raise ValueError("step_limit must be positive")
     run_dir = Path(run_dir).resolve()
     operators = LogicalOperators(run_dir / "workspace", model_factory=physical_model_factory,
-                                 step_limit=physical_step_limit, command_timeout=command_timeout)
+                                 step_limit=physical_step_limit, command_timeout=command_timeout,
+                                 proxy_variant=proxy_variant)
     if planner_model is None:
         planner_model = PlanningModel(**make_model().config.model_dump())
-    task = _context(operators.workspace) + "\n设计并执行采样、标注、proxy 训练、验证和全库部署计划。"
+    variant_instruction = proxy_variant_instruction(proxy_variant)
+    task = (_context(operators.workspace) + "\n设计并执行采样、标注、proxy 训练、验证和全库部署计划。"
+            + variant_instruction)
     write_json(operators.workspace / "output/usage.json", operators.semantic.usage())
-    agent = DefaultAgent(planner_model, _LogicalEnvironment(operators), system_template=PLANNING_PROMPT,
+    agent = DefaultAgent(planner_model, _LogicalEnvironment(operators),
+                         system_template=PLANNING_PROMPT + variant_instruction,
                          instance_template="{{ task }}", step_limit=step_limit, cost_limit=0,
                          output_path=run_dir / "logical.trajectory.json")
     result = agent.run(task)

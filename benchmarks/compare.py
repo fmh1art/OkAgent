@@ -36,26 +36,31 @@ def snapshot(round_name):
 
 
 def run_case(round_name, method, job="job01", *, resume=False, previous_run=None,
-             validation_ids=None, validation_fixed=True, validation_sample_ids=None):
+             validation_ids=None, validation_fixed=True, validation_sample_ids=None,
+             proxy_variant="control"):
     directory = ROOT / "results/comparison" / round_name
     sys.path.insert(0, str(directory / "runtime"))
     os.environ["OKAGENT_LLM_CONFIG"] = str(ROOT / "_config/llm.json")
     from okagent.data import prepare, write_json
     from okagent.evaluation import evaluate
 
+    if proxy_variant != "control" and method not in ("baseline", "lo_ph"):
+        raise ValueError("proxy_variant applies only to baseline and lo_ph")
     run = directory / f"{method}-{job}"
     previous = None
     if resume:
         if previous_run is not None:
             raise ValueError("Use resume or previous_run, not both")
         previous = json.loads((run / "experiment.json").read_text())
+        if previous.get("proxy_variant", "control") != proxy_variant:
+            raise ValueError("A resumed run must keep its original proxy_variant")
         archive = run / "previous_attempts" / str(time.time_ns())
         archive.mkdir(parents=True)
         for path in [run / "experiment.json", run / "evaluation.json", run / "error.txt", *run.glob("*.trajectory.json")]:
             if path.exists():
                 shutil.move(path, archive / path.name)
     else:
-        prepare(directory / "hiring.json", run, job=job)
+        prepare(directory / "hiring.json", run, job=job, proxy_variant=proxy_variant)
     initial_calls = previous.get("initial_calls", 0) if previous else 0
     if previous_run is not None:
         old = Path(previous_run) / "workspace/output/semantic.sqlite"
@@ -86,7 +91,7 @@ def run_case(round_name, method, job="job01", *, resume=False, previous_run=None
         write_json(workspace / "continuation.json", continuation)
         with (workspace / "prompt.md").open("a") as prompt:
             prompt.write("\n## 续跑要求（优先于默认重新划分步骤）\n先读取 continuation.json，严格复用其中的验证划分、已有标签和预算。\n")
-    metadata = dict(round=round_name, method=method, job=job,
+    metadata = dict(round=round_name, method=method, job=job, proxy_variant=proxy_variant,
                     source_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip(),
                     started_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), status="running")
     metadata.update(initial_calls=initial_calls, previous_run=str(previous_run) if previous_run else (previous or {}).get("previous_run"),
@@ -99,7 +104,7 @@ def run_case(round_name, method, job="job01", *, resume=False, previous_run=None
             run_agent(run, command_timeout=7200)
         elif method == "lo_ph":
             from okagent.lo_ph_agent import run_lo_ph_agent
-            run_lo_ph_agent(run, command_timeout=7200)
+            run_lo_ph_agent(run, command_timeout=7200, proxy_variant=proxy_variant)
         elif method in ("hydra", "hydra_replay"):
             from okagent.semantic import SemanticOperator
             from other_methods.hydra import Config, run_hiring

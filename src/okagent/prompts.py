@@ -38,7 +38,42 @@ PROXY_SKILL = """## 稀少正例 proxy 实验要点
 """
 
 
-def build_prompt(workspace, job, count, config):
+PROXY_VARIANT_INSTRUCTIONS = {
+    "control": "",
+    "cascade": """## 本实验变体：cascade（以下规则替代上文的单一胜出模型部署规则）
+- 训练两级 cascade：第一级是计算便宜的 recall gate，目标是尽量不漏正例；第二级只对第一级放行的候选评分，目标是减少假阳性。候选仍限于已有向量 LR、字符 TF-IDF LR 和 CPU Qwen3-0.6B，不增加远程模型。
+- 在同一独立 validation 上联合搜索 `(stage1_threshold, stage2_threshold)`，最终预测是 `stage1_score>=t1 AND stage2_score>=t2`。选择 validation recall>=0.9 的组合中 precision 最高者；无人达标时先最大化 recall、再比较 precision。禁止分别校准两个阈值后直接相与，因为那不能保持端到端 recall。
+- 必须把单模型候选也作为对照；只有 cascade 按上述端到端规则优于最佳单模型时才部署 cascade，否则部署最佳单模型并说明原因。
+- 保存两个 stage 的 backend、模型/特征、阈值和顺序；报告第一级放行数量、第二级评分数量、端到端指标、单模型对照及 CPU/Qwen 耗时。Deploy 必须严格恢复相同流程。
+""",
+    "paper_skill": """## 本实验变体：paper_skill（以下规则替代上文默认的主动采样比例与不平衡训练规则）
+- validation 仍是固定、随机、与训练互斥的总体分布样本，绝不下采样；训练先随机 bootstrap，随后每批按 proxy 置信度分层主动学习：约 50% 预测少数类高置信样本、20% 决策边界样本、15% 特征多样性样本、15% 全库随机探索。正例极少时可提高少数类配额，但必须保留随机探索。
+- 每轮保存各采样来源的 ID、命中正例数/正例率以及训练集不平衡比 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`。只有一个类别或少数类不足 10 时继续探索，不能宣称 proxy 可靠。
+- `rho<50` 时比较全量训练标签上的 balanced LR；`rho>=50` 且少数类足够时，额外比较多数类下采样的平衡 bagging：保留全部少数类，使用 5--10 个固定 seed 各抽取等量多数类训练模型并平均概率。只按独立 validation 选择方法和阈值；不得下采样 validation，也不得用训练指标选择。
+- proxy 候选和部署规则仍按上文执行。报告完整训练、下采样/集成方案各自 validation 指标，并说明采样偏差与少量正例造成的不确定性。
+""",
+    "combined": """## 本实验变体：combined（同时执行下列采样/训练规则和 cascade 规则）
+- 使用 paper_skill：固定总体分布 validation 不下采样；随机 bootstrap 后，每批约 50% 预测少数类高置信、20% 边界、15% 多样性、15% 随机探索。记录每个来源的 ID、正例命中和 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`；单类或少数类不足 10 时继续探索。
+- `rho>=50` 且少数类足够时，对 LR 候选增加平衡 bagging：保留全部少数类，以 5--10 个固定 seed 分别抽取等量多数类训练并平均概率；`rho<50` 时使用全量标签和 balanced LR。validation 始终保持原分布并只用于模型/阈值选择。
+- 使用 cascade：第一级为便宜的 recall gate，第二级只评分第一级放行者以提高 precision。候选限于已有向量 LR、字符 TF-IDF LR、CPU Qwen3-0.6B 及上述 LR bagging。
+- 在同一 validation 上联合搜索 `(t1,t2)`，以 `stage1_score>=t1 AND stage2_score>=t2` 计算端到端指标；在 recall>=0.9 的组合中最大化 precision，无组合达标时先最大化 recall。禁止独立校准后直接相与。
+- 与最佳单模型公平比较，cascade 仅在端到端规则下胜出才部署。保存采样轨迹、两个 stage 的完整配置/阈值、放行与评分数量、单模型对照、端到端指标和耗时；Deploy 必须恢复同一流程。
+""",
+}
+
+
+def proxy_variant_instruction(proxy_variant="control"):
+    try:
+        return PROXY_VARIANT_INSTRUCTIONS[proxy_variant]
+    except KeyError as error:
+        raise ValueError(f"Unknown proxy_variant {proxy_variant!r}; choose from {sorted(PROXY_VARIANT_INSTRUCTIONS)}") from error
+
+
+def proxy_skill(proxy_variant="control"):
+    return PROXY_SKILL + proxy_variant_instruction(proxy_variant)
+
+
+def build_prompt(workspace, job, count, config, proxy_variant="control"):
     requirements = "\n".join(f"- {item}" for item in job["must_have_qualifications"])
     return f"""在 `{workspace}` 完成「{job['job_title']}」的候选人筛选，共 {count} 人。
 目标是在最多 {config['max_calls']} 次逐人 LLM 查询内训练 proxy 并预测全库，优先 recall，兼顾 precision。
@@ -71,7 +106,7 @@ cached = op.get_label(ids[0])  # 仅查缓存；未查询过则 None
 ## 实验流程
 Partition、Sample、Label、Proxy、Deploy 仅表示以下代码阶段，无需实现额外规划 agent 或算子框架。
 检查人数、分段和缺失值，不漏掉缺失分段者，不用关键词硬排除。预算耗尽仍为单类时保存明确的保守兜底，不伪造二分类模型。
-{PROXY_SKILL}
+{proxy_skill(proxy_variant)}
 
 ## 输出
 保存 `pipeline.py`（重跑复用标签缓存），并实际执行。`output/` 内保存：

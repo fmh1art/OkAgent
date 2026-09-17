@@ -21,6 +21,8 @@ PROXY_SKILL = """## 稀少正例 proxy 实验要点
 - 候选 proxy 至少比较：① unstructured 已有向量 + balanced LogisticRegression；② 中文字符 TF-IDF + balanced LogisticRegression；
   ③用 transformers/torch 在 CPU 加载 `Qwen/Qwen3-0.6B`，将岗位要求和简历直接交给 Qwen 本体，比较 A=不匹配、B=匹配的下一 token logits 并转成匹配概率。
   第③项不是 Qwen embedding + LR，也不调用远程 Qwen API。代码由你在 pipeline.py 中实现；可从训练标签选择少量平衡 demonstrations，验证标签只能选阈值和模型，不能进入 demonstrations。
+- Qwen 必须按纯 CPU 且不依赖 accelerate 的方式加载：`AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32)` 后调用 `.to('cpu').eval()`；
+  禁止传 `device_map`、`low_cpu_mem_usage=True` 或调用 `torch.set_default_device`。加载后先记录模型类、参数所在 device 和参数量，再做 2 人冒烟；这些证据写入报告。
 - 三个候选必须使用完全相同的独立验证 ID。Qwen 先对 2 人冒烟，再只评分验证集；仅当它按“满足 recall>=0.9 后 precision 更高，
   否则先比 recall、再比 precision”的规则胜出时才评分全库。记录每个候选的 recall、precision、阈值、评分耗时和失败原因，禁止静默回退。
   Qwen 权重或依赖不可用、模型加载或 CPU 推理失败时，不得伪造成 Qwen 结果；记录具体失败原因后选择验证表现最好的可用候选。

@@ -44,6 +44,7 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 复用当前 workspace 的已有输入和 SemanticOperator 预算/缓存，不修改输入文件和其他算子的产物。
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
 Proxy 必须尝试把 CPU 上的 `Qwen/Qwen3-0.6B` 作为候选之一：在本次 implementation.py 中用 transformers/torch 加载模型，把岗位要求和简历直接交给 Qwen 本体，比较 A=不匹配、B=匹配的下一 token logits；不得改成 Qwen embedding + LR 或远程 Qwen API。
+纯 CPU 加载必须使用 `AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to('cpu').eval()`；禁止传 `device_map`、`low_cpu_mem_usage=True` 或调用 `torch.set_default_device`，从而不依赖 accelerate。报告模型类、参数 device、参数量及 2 人冒烟结果。
 在同一 validation 上比较已有向量 LR、字符 TF-IDF LR 和 Qwen；Qwen 先做 2 人冒烟且只评分 validation，胜出后才跑全库。记录所有候选指标、耗时和失败原因，不得静默回退；依赖、权重、加载或推理失败时记录具体原因。
 选择规则为：先比较是否达到 recall>=0.9，达到者取 precision 较高者；无人达到时先取 recall、再取 precision。Qwen 的 train 标签只用于选择少量平衡 demonstrations，validation 不得进入 demonstrations。
 若 sklearn 胜出，将完整特征变换与分类器保存为 Pipeline；若 Qwen 胜出，artifact 保存 backend、模型名、prompt/截断/批量配置、demonstrations、分数缓存和阈值，Deploy 按这些信息恢复同一评分过程。不要把 Qwen 权重复制进工作区。

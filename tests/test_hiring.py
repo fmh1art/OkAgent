@@ -19,6 +19,7 @@ def test_prepare_and_evaluate(run):
     prompt = (workspace / "prompt.md").read_text()
     assert all(name in prompt for name in ("Partition", "Sample", "Label", "Proxy", "Deploy"))
     assert "最多 3 次" in prompt
+    assert "禁止传 `device_map`" in prompt
     output(run, ["a", "b"])
     result = evaluate(run)
     assert [result[key] for key in ("tp", "fp", "fn", "tn")] == [1, 1, 2, 2]

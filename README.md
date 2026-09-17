@@ -6,7 +6,6 @@
 
 - **主项目**：准备工作区和任务 prompt，由最基础的 mini-swe-agent 编写、执行采样、标注、proxy 训练及预测代码，最后统一评估。
 - **复现方法**：`other_methods/hydra` 实现 Hydra 的主动采样、逻辑回归与 recall 阈值校准，可直接运行。
-- **CPU Qwen proxy**：baseline 和 LO-PH 直接以 `Qwen/Qwen3-0.6B` 因果语言模型作为 proxy，比较 A/B 类别 token logits；不是 Qwen embedding + LR。Hydra 的固定算法仍可单独选择 stored 或 Qwen embedding 后端。
 
 所有入口都是 Python 函数。code agent 只有“模型 → bash → 观察结果”的循环，逐人标注由 `SemanticOperator` 提供。
 
@@ -21,8 +20,6 @@ OkAgent/
 │   ├── prompts.py                # 简短的系统 prompt 和训练任务 prompt
 │   ├── agent.py                  # mini-swe-agent 运行入口
 │   ├── lo_ph_agent.py            # logical 函数规划 → physical 子 agent 执行
-│   ├── qwen_causal_proxy.py      # CPU 小 Qwen 本体直接进行 A/B proxy 分类
-│   ├── qwen_proxy.py             # Qwen embedding 后端，仅供 Hydra/对照实验
 │   ├── semantic.py               # 逐人 LLM 标注、预算与标签缓存
 │   └── evaluation.py             # evaluate：统一评估
 ├── other_methods/
@@ -54,30 +51,12 @@ source .venv/bin/activate
 # 主项目、code agent、训练工具及测试依赖
 uv pip install -e '.[agent,test]'
 
-# 启用 CPU Qwen proxy（transformers>=4.51）
-uv pip install -e '.[agent,test,proxy]'
-
 # other_methods/hydra 的复现环境
 uv pip install -r other_methods/hydra/requirements.txt
 ```
 
 不运行 Hydra 时可省略最后一条命令；不需要测试时使用 `'.[agent]'`。
 只准备/评估数据或运行 Hydra replay 时，主包选择 `'.[test]'` 即可，Hydra 仍需安装其 `requirements.txt`；无需 agent 依赖和模型接口。
-
-baseline/LO-PH 的本地 proxy 直接运行 `Qwen/Qwen3-0.6B`：
-
-```python
-from okagent.qwen_causal_proxy import QwenCausalProxy
-
-proxy = QwenCausalProxy.from_workspace(".")
-proxy.fit(train_labels)                 # 只传训练标签，选择 few-shot demonstrations
-scores = proxy.score_ids(candidate_ids) # Qwen 本体的 A/B token logits → P(match)
-proxy.save("output/proxy.pkl", threshold=threshold)
-```
-
-服务器真实 CPU 冒烟中，模型进程峰值内存约 5.1 GiB；权重已缓存后的冷启动加两人评分约 15 秒。
-full 库默认使用 512 tokens、batch 32、两条 demonstrations，并把岗位和当前简历放在 prompt 尾部，避免左截断丢失决策输入。
-全库分数会按数据库、岗位、配置和 demonstrations 缓存到 `OKAGENT_QWEN_CAUSAL_CACHE`。
 
 ### 没有 uv 时
 
@@ -225,7 +204,7 @@ print(result["evaluation"])
 参考的是 `OptiHarnessForCost/agent/mini-swe-agent` 的基础结构，运行时通过已安装的包调用，不依赖参考项目路径。
 组件组合方式见 [mini-swe-agent Python 用法](https://mini-swe-agent.com/latest/advanced/cookbook/)。
 
-prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → CPU Qwen3-0.6B 本体按 A/B token logits 直接评分 → 增量采样 → recall 优先的阈值选择 → 全库预测。主 proxy 禁止替换为 Qwen embedding + LR。
+prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → 中文字符 TF-IDF + 加权逻辑回归 → 增量采样 → recall 优先的阈值选择 → 全库预测。
 同时约束类别极不均衡、单类训练、验证集无正例、采样偏差与标签覆盖预测等情况。
 Partition、Sample、Label、Proxy、Deploy 只表示代码阶段。具体训练脚本由 code agent 编写。
 
@@ -335,39 +314,6 @@ Label 提交时检查完整 ID 覆盖和成功缓存中的标签；模型、特�
 先完成第 2 节的 Hydra 依赖安装。该实现复现压缩包实际启用的路径：
 **主动采样 → 逻辑回归 → 目标 recall 单阈值校准 → 全库预测**。
 NumPy/SciPy 替代原模型实现，DuckDB 和 Python 回调替代内部运行依赖。
-
-优化后的 CPU 招聘配置可用 `Config.hiring_cpu(max_calls=2000)`；配合
-`run_hiring(..., feature_backend="qwen")` 使用 256 维、128-token、按简历分段均衡保留文本的 Qwen 语义特征和岗位 query 初始化，
-并启用正则化、更大的训练/校准预算。默认 `Config()` 和 `feature_backend="stored"` 仍保留，便于复现旧结果。
-
-统一的全量实验入口为：
-
-```bash
-python benchmarks/run_full.py precompute --job job01 --run-dir results/qwen-job01
-python benchmarks/run_full.py baseline --job job01 --run-dir results/baseline-job01
-python benchmarks/run_full.py lo_ph --job job01 --run-dir results/lo-ph-job01
-python benchmarks/run_full.py hydra --job job01 --run-dir results/hydra-job01
-```
-
-先做小规模端到端验证时，可显式选择服务器已有的 1k 数据库并覆盖标注预算：
-
-```bash
-python benchmarks/run_full.py precompute --job job01 --dataset 1k --max-calls 200 --run-dir results/qwen-job01-1k
-python benchmarks/run_matrix.py --tag qwen-1k --jobs job01 --dataset 1k --max-calls 200 --max-parallel 3
-```
-
-1k 库的类别分布与 full 库明显不同，结果只用于流程和相对行为检查，不能替代 full 评估。
-Hydra 的 CPU profile 会按约 64%/36% 自动拆分训练与校准预算；200 次预算对应
-128 个训练标签和 72 个校准标签。
-
-设置 `OKAGENT_QWEN_CACHE` 可让不同工作区共享一次编码结果。正式比较仍应为每个方法使用新的
-run-dir 和独立 2,000 次标注账本；`precompute` 不调用标注 API。
-完成岗位特征预计算后，可用下列命令并发运行完整比较矩阵；每组输出、日志和账本相互隔离，
-`manifest.json` 记录退出码与耗时：
-
-```bash
-python benchmarks/run_matrix.py --tag qwen-v1 --jobs job01 job04 --max-parallel 3
-```
 
 ### 离线 replay：无需模型接口或 API key
 

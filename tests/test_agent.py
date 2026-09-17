@@ -92,8 +92,10 @@ def test_failed_requests_charge_and_budget_persists(run, llm, bad_response):
     op = SemanticOperator(run / "workspace")
     with pytest.raises(Exception, match="test failure"):
         op.label("a")
-    assert len(requests) == 1  # HTTP errors are surfaced; only malformed judgments retry.
-    assert op.label("a") == 1
+    assert len(requests) == 1  # HTTP errors must not trigger hidden retries.
+    with pytest.raises(ValueError):
+        op.label("a")
+    assert SemanticOperator(run / "workspace").label("a") == 1
     with pytest.raises(BudgetExceeded):
         SemanticOperator(run / "workspace").label("b")
     assert op.label("a") == 1  # Cached successes remain available after exhaustion.
@@ -226,17 +228,15 @@ def test_model_format_tolerance_and_failed_token_record(run, llm):
     llm[1].extend([
         (200, '```json\n{"candidate_id":"a","is_match":{"result":true},"reason":"line one\nline two"}\n```'),
         (200, '{bad JSON'),
-        judgment('b', 0),
     ])
     op = SemanticOperator(run / 'workspace')
     assert op.label('a') == 1
-    assert op.label('b') == 0
+    with pytest.raises(ValueError):
+        op.label('b')
     with sqlite3.connect(op.state) as con:
-        rows = con.execute("SELECT label,response FROM queries WHERE candidate_id='b' ORDER BY call_id").fetchall()
-    label, response = rows[0]
+        label, response = con.execute("SELECT label,response FROM queries WHERE candidate_id='b'").fetchone()
     assert label is None and json.loads(response)['_usage']['total_tokens'] == 2
-    assert [row[0] for row in rows] == [None, 0]
-    assert op.usage()['llm_calls'] == 3
+    assert op.usage()['llm_calls'] == 2
 
 
 def test_optional_endpoint_pacing_applies_to_parallel_requests(run, llm, monkeypatch, tmp_path):

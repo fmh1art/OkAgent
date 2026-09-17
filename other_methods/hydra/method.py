@@ -29,18 +29,6 @@ class Config:
     label_workers: int = 1
     seed: int = 42
 
-    @classmethod
-    def hiring_cpu(cls, max_calls=2000, **overrides):
-        """Higher-budget regularized profile for the cached Qwen hiring backend."""
-        training_budget = min(1280, max(1, int(max_calls * 0.64)))
-        calibration_budget = max(0, max_calls - training_budget)
-        values = dict(sample_size=training_budget, calibration_sample_size=calibration_budget,
-                      target_recall=0.9,
-                      lr_lambda=1.0, step=64, adaptive=False, max_calls=max_calls,
-                      batch_size=1, label_workers=8, seed=42)
-        values.update(overrides)
-        return cls(**values)
-
     def validate(self):
         for name in ("sample_size", "step", "patience", "max_calls", "batch_size", "label_workers"):
             if type(getattr(self, name)) is not int or getattr(self, name) <= 0:

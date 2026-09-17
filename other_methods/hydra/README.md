@@ -22,10 +22,6 @@ report = evaluate("results/hydra-job01")
 没有真实 API 开销。`usage.json` 的 `llm_calls` 在 replay 模式是模拟请求数。
 训练默认最多 1024 人，校准最多 512 次抽样；每请求默认 1 人，总请求上限读取工作区预算。
 可用 `Config(batch_size=8, target_recall=0.9)` 调整；batch 算一次请求，同时记录实际标注人数。
-招聘全量优化配置使用 `Config.hiring_cpu(max_calls=2000)`，并通过
-`run_hiring(..., feature_backend="qwen")` 选择可缓存的 Qwen3-Embedding-0.6B CPU 特征与岗位 query 初始化。
-该配置使用 256 维 Qwen 特征、L2 正则、1,280 个训练样本和 900 次重要性校准抽样；
-默认 stored backend/Config 不变，仍可复现原始路径。
 
 若要实际调用 LLM，传入 `label(ids) -> [0/1, ...]` 回调，每次回调最多一次请求，禁止回调内部偷偷重试。
 回调自行读取 `workspace/job.json`、`label_prompt.txt` 和请求 ID 的简历文本。每次调用前计数，

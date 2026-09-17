@@ -48,14 +48,14 @@ cd /home/fanmeihao/projects/OkAgent
 uv venv --python 3.10 .venv
 source .venv/bin/activate
 
-# 主项目、code agent、训练工具及测试依赖
-uv pip install -e '.[agent,test]'
+# 主项目、code agent、训练工具、本地 Qwen proxy 及测试依赖
+uv pip install -e '.[agent,proxy,test]'
 
 # other_methods/hydra 的复现环境
 uv pip install -r other_methods/hydra/requirements.txt
 ```
 
-不运行 Hydra 时可省略最后一条命令；不需要测试时使用 `'.[agent]'`。
+不运行 Hydra 时可省略最后一条命令；不需要测试时使用 `'.[agent,proxy]'`。
 只准备/评估数据或运行 Hydra replay 时，主包选择 `'.[test]'` 即可，Hydra 仍需安装其 `requirements.txt`；无需 agent 依赖和模型接口。
 
 ### 没有 uv 时
@@ -63,7 +63,7 @@ uv pip install -r other_methods/hydra/requirements.txt
 ```bash
 python3.10 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[agent,test]' -r other_methods/hydra/requirements.txt
+python -m pip install -e '.[agent,proxy,test]' -r other_methods/hydra/requirements.txt
 ```
 
 后续使用激活环境中的 `python`，或显式使用 `.venv/bin/python`，避免误用系统 Python。
@@ -83,6 +83,7 @@ python -m pip install -e '.[agent,test]' -r other_methods/hydra/requirements.txt
 | OpenAI SDK | 逐人标注的兼容接口客户端 | 2.54.0 |
 | Jinja2 | 填充原始匹配模板 | 3.1.6 |
 | scikit-learn | agent 可使用的 TF-IDF、分类器和评估工具 | 1.7.2 |
+| Transformers / PyTorch | CPU 上直接运行 Qwen3-0.6B proxy | 兼容范围见 `pyproject.toml` |
 
 依赖文件使用兼容版本范围。需要对齐本次复现环境时，可在安装后固定上述库版本：
 
@@ -204,7 +205,8 @@ print(result["evaluation"])
 参考的是 `OptiHarnessForCost/agent/mini-swe-agent` 的基础结构，运行时通过已安装的包调用，不依赖参考项目路径。
 组件组合方式见 [mini-swe-agent Python 用法](https://mini-swe-agent.com/latest/advanced/cookbook/)。
 
-prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → 中文字符 TF-IDF + 加权逻辑回归 → 增量采样 → recall 优先的阈值选择 → 全库预测。
+prompt 要求 agent 实际完成：随机留出验证集 → 采样标注 → 增量采样 → 在已有向量 LR、字符 TF-IDF LR 和 CPU Qwen3-0.6B 直接分类之间选择 proxy → recall 优先的阈值选择 → 全库预测。
+Qwen 候选直接比较 A/B 下一 token logits，不使用 Qwen embedding；先只评分相同验证集，只有胜出后才评分全库。
 同时约束类别极不均衡、单类训练、验证集无正例、采样偏差与标签覆盖预测等情况。
 Partition、Sample、Label、Proxy、Deploy 只表示代码阶段。具体训练脚本由 code agent 编写。
 
@@ -254,7 +256,7 @@ agent 在工作区保存可重跑的 `pipeline.py`，并在 `workspace/output/` 
 | --- | --- |
 | `candidate_ids.json` | 匹配候选人的字符串 ID 数组，例如 `["id_a", "id_b"]`；无匹配时为 `[]` |
 | `usage.json` | 标注器自动生成，包含 `llm_calls`，次数必须是非负整数 |
-| `proxy.pkl` | 特征变换、分类器和阈值；无法训练时保存明确的兜底规则 |
+| `proxy.pkl` | 胜出 proxy 的 backend、模型/配置和阈值；无法训练时保存明确的兜底规则 |
 | `report.md` | 采样策略、预算分配、标签分布、验证结果与局限 |
 | `semantic.sqlite` | 标注器自动记录每次尝试及成功的原始 JSON 判断 |
 
@@ -289,6 +291,7 @@ print(result["evaluation"])
 ```
 
 规划 agent 只能调用 `partition / sample / label / proxy / deploy / finish` 函数工具。
+`proxy` 算子在相同验证集上比较已有向量 LR、字符 TF-IDF LR 与 CPU Qwen3-0.6B；Qwen 胜出时，`deploy` 通过 `QwenCausalProxy.load` 恢复相同配置和 demonstrations。
 前五个函数每次启动一个新的 mini-swe-agent，使用关注实现和自检的初始 prompt；规划 prompt 关注数据拆分、采样、预算和步骤依赖。
 两层 agent 共享同一个 workspace、数据和标注缓存，每次实现 agent 的对话独立。
 

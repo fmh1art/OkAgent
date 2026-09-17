@@ -20,7 +20,7 @@ CONTRACTS = {
     "partition": "输入 table；按指定方法分区。返回各分区的 ID 数组 JSON，分区互斥且并集等于输入，artifacts 的键为分区名。",
     "sample": "输入 table，可选 exclude；返回 artifacts.table（ID 数组 JSON）。去重、属于输入、与 exclude 不相交，检查数量和随机种子。",
     "label": "输入 table；用 SemanticOperator('.').label_many(ids, workers=8) 发出独立逐人请求。返回 artifacts.table（JSON 行数组，每行 candidate_id 和整数 label=0/1），覆盖输入 ID。",
-    "proxy": "输入 train，应提供 validation；在相同验证 ID 上比较已有向量 LR、字符 TF-IDF LR、CPU Qwen3-0.6B 直接 A/B logits。仅用 train 拟合或选择 demonstrations，validation 只选阈值和胜出模型。返回 artifacts.model。",
+    "proxy": "输入 train，应提供 validation；唯一 proxy 是 CPU Qwen3-0.6B 直接 A/B logits，禁止训练、比较或回退到 LR/TF-IDF 分类器。train 只选择固定 demonstrations，validation 只校准 Qwen 阈值。返回 artifacts.model。",
     "deploy": "输入 table、model，可选 validation；按指定方法选择阈值并预测完整输入，缓存的真实标签覆盖预测。返回 artifacts.candidate_ids（去重的匹配 ID 数组 JSON）和验证说明。",
 }
 REQUIRED_INPUTS = {"partition": {"table"}, "sample": {"table"}, "label": {"table"},
@@ -43,13 +43,12 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 严格遵守输入、方法和输出约定，实际写代码、运行并自检；不要另行规划整个实验或递归启动 agent。
 复用当前 workspace 的已有输入和 SemanticOperator 预算/缓存，不修改输入文件和其他算子的产物。
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
-Proxy 必须尝试把 CPU 上的 `Qwen/Qwen3-0.6B` 作为候选之一：在本次 implementation.py 中用 transformers/torch 加载模型，把岗位要求和简历直接交给 Qwen 本体，比较 A=不匹配、B=匹配的下一 token logits；不得改成 Qwen embedding + LR 或远程 Qwen API。
+Proxy 必须仅使用 CPU 上的 `Qwen/Qwen3-0.6B`：在本次 implementation.py 中用 transformers/torch 加载模型，把岗位要求和简历直接交给 Qwen 本体，比较 A=不匹配、B=匹配的下一 token logits。禁止训练、比较、选择或回退到 embedding LR、TF-IDF LR 或其他 sklearn 分类器；不得改成 Qwen embedding + LR 或远程 Qwen API。
 纯 CPU 加载必须使用 `AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to('cpu').eval()`；禁止传 `device_map`、`low_cpu_mem_usage=True` 或调用 `torch.set_default_device`，从而不依赖 accelerate。报告模型类、参数 device、参数量及 2 人冒烟结果。
-在同一 validation 上比较已有向量 LR、字符 TF-IDF LR 和 Qwen；Qwen 先做 2 人冒烟且只评分 validation，胜出后才跑全库。记录所有候选指标、耗时和失败原因，不得静默回退；依赖、权重、加载或推理失败时记录具体原因。
-选择规则为：先比较是否达到 recall>=0.9，达到者取 precision 较高者；无人达到时先取 recall、再取 precision。Qwen 的 train 标签只用于选择少量平衡 demonstrations，validation 不得进入 demonstrations。
-若 sklearn 胜出，将完整特征变换与分类器保存为 Pipeline；若 Qwen 胜出，artifact 保存 backend、模型名、prompt/截断/批量配置、demonstrations、分数缓存和阈值，Deploy 按这些信息恢复同一评分过程。不要把 Qwen 权重复制进工作区。
+Qwen 的 train 标签只用于选择少量固定平衡 demonstrations，validation 不得进入 demonstrations。tokenizer 使用 `truncation=True,max_length=1024`；分批评分并把由模型名、岗位、文本、prompt、截断配置和 demonstrations 哈希标识的分数增量缓存到 output，重跑不得重复计算。
+artifact 的 backend 必须是 `qwen_direct`，保存模型名、prompt/截断/批量配置、demonstrations、分数缓存和阈值；Deploy 按这些信息恢复同一评分过程。Qwen 失败时算子必须失败，不得回退 LR。不要把 Qwen 权重复制进工作区。
 主动采样从 SemanticOperator('.').cached_labels() 的键排除全部已标注 ID，不能只用启动时的训练文件；读取行数组时提取 row['candidate_id']，不能把整个字典转成字符串当 ID。
-Deploy 根据 artifact 的 backend 恢复胜出模型；验证和全库必须使用完全相同的评分路径，并自检同一 ID 的分数一致。
+Deploy 根据 `qwen_direct` artifact 恢复 Qwen；验证和全库必须使用完全相同的评分路径并优先复用分数缓存，自检同一 ID 的分数一致。
 阈值按 precision_recall_curve 的升序 thresholds 取 np.flatnonzero(recall[:-1] >= 0.9)[-1]；若自行按分数降序累计召回，则取第一个达标位置，不能取最后一个。自检没有更大的合格阈值。
 result.json 的 summary 必须为字符串；统计对象另存文件。table.json 必须用 json.dump(rows, f) 保存一个 JSON 数组，禁止 JSONL。
 Label 必须覆盖全部输入 ID；失败后可复用缓存补齐，不能把部分标注表当作成功结果。无法补齐时明确失败。

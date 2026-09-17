@@ -43,10 +43,10 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 严格遵守输入、方法和输出约定，实际写代码、运行并自检；不要另行规划整个实验或递归启动 agent。
 复用当前 workspace 的已有输入和 SemanticOperator 预算/缓存，不修改输入文件和其他算子的产物。
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
-Proxy 必须把 `okagent.qwen_causal_proxy.QwenCausalProxy` 作为候选之一；它由 CPU 上的 Qwen3-0.6B 本体直接比较 A/B logits，不是 Qwen embedding + LR。
-在同一 validation 上比较已有向量 LR、字符 TF-IDF LR 和 Qwen；Qwen 先做 2 人冒烟且只评分 validation，胜出后才跑全库。记录所有候选指标、耗时和失败原因，不得静默回退。
-选择规则为：先比较是否达到 recall>=0.9，达到者取 precision 较高者；无人达到时先取 recall、再取 precision。Qwen 的 train 标签只用于 `fit` demonstrations，validation 不得进入 demonstrations。
-若 sklearn 胜出，将完整特征变换与分类器保存为 Pipeline；若 Qwen 胜出，用 `QwenCausalProxy.save` 保存并由 Deploy 用 `QwenCausalProxy.load` 恢复。先小批验证接口再跑全库。
+Proxy 必须尝试把 CPU 上的 `Qwen/Qwen3-0.6B` 作为候选之一：在本次 implementation.py 中用 transformers/torch 加载模型，把岗位要求和简历直接交给 Qwen 本体，比较 A=不匹配、B=匹配的下一 token logits；不得改成 Qwen embedding + LR 或远程 Qwen API。
+在同一 validation 上比较已有向量 LR、字符 TF-IDF LR 和 Qwen；Qwen 先做 2 人冒烟且只评分 validation，胜出后才跑全库。记录所有候选指标、耗时和失败原因，不得静默回退；依赖、权重、加载或推理失败时记录具体原因。
+选择规则为：先比较是否达到 recall>=0.9，达到者取 precision 较高者；无人达到时先取 recall、再取 precision。Qwen 的 train 标签只用于选择少量平衡 demonstrations，validation 不得进入 demonstrations。
+若 sklearn 胜出，将完整特征变换与分类器保存为 Pipeline；若 Qwen 胜出，artifact 保存 backend、模型名、prompt/截断/批量配置、demonstrations、分数缓存和阈值，Deploy 按这些信息恢复同一评分过程。不要把 Qwen 权重复制进工作区。
 主动采样从 SemanticOperator('.').cached_labels() 的键排除全部已标注 ID，不能只用启动时的训练文件；读取行数组时提取 row['candidate_id']，不能把整个字典转成字符串当 ID。
 Deploy 根据 artifact 的 backend 恢复胜出模型；验证和全库必须使用完全相同的评分路径，并自检同一 ID 的分数一致。
 阈值按 precision_recall_curve 的升序 thresholds 取 np.flatnonzero(recall[:-1] >= 0.9)[-1]；若自行按分数降序累计召回，则取第一个达标位置，不能取最后一个。自检没有更大的合格阈值。

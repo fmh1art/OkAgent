@@ -52,6 +52,13 @@ PROXY_VARIANT_INSTRUCTIONS = {
 - `rho<50` 时从全部训练标签选择固定平衡 demonstrations；`rho>=50` 且少数类足够时，使用 5--10 个固定 seed 各下采样等量多数类，形成多组平衡 demonstrations，并平均各组 Qwen 概率。只按独立 validation 选择 demonstration 方案和阈值；不得下采样 validation，也不得训练 LR。
 - proxy 始终是上文的 Qwen direct。报告单组 demonstrations 与下采样多组集成各自 validation 指标，并说明采样偏差与少量正例造成的不确定性。
 """,
+    "paper_skill_lr": """## 本实验变体：paper_skill_lr（以下规则替代上文全部 Qwen 规则）
+- 本变体完全禁止加载或调用 Qwen/transformers/torch。唯一 proxy 使用 unstructured 2048 维已有向量，以及 `StandardScaler + LogisticRegression(class_weight='balanced', random_state=42)`；不得使用 Qwen embedding、TF-IDF 或远程模型。
+- validation 是固定、随机、与训练互斥的总体分布样本，绝不下采样。训练先随机 bootstrap，随后每批约 50% 预测少数类高置信、20% 决策边界、15% embedding 多样性、15% 全库随机探索；正例极少时可提高少数类配额，但必须保留随机探索。
+- 每轮保存各采样来源 ID、正例命中数/命中率以及 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`。单类或少数类不足 10 时继续探索，不能宣称 proxy 可靠。
+- `rho<50` 时使用全部训练标签拟合 balanced LR；`rho>=50` 且少数类足够时，同时评估多数类下采样 bagging：保留全部少数类，以 5--10 个固定 seed 各抽取等量多数类训练 LR，并平均概率。只按独立 validation 选择完整训练或 bagging，validation 不得下采样。
+- 阈值仍按端到端 validation recall>=0.9 的最大合格值选择；零正例时必须报告 recall/threshold 不可校准，禁止声称达标。`proxy.pkl` backend 必须是 `embedding_lr_paper_skill`，保存 scaler、单模型或 bagging 模型、阈值、采样轨迹和固定 seed。
+""",
     "combined": """## 本实验变体：combined（以下规则替代上文 Qwen-only 部署，同时执行 paper_skill sampling 与 LR→Qwen cascade）
 - 使用 paper_skill：固定总体分布 validation 不下采样；随机 bootstrap 后，每批约 50% 预测少数类高置信、20% 边界、15% 多样性、15% 随机探索。记录每个来源的 ID、正例命中和 `rho=多数类数/少数类数` 到 `output/sampling_trace.json`；单类或少数类不足 10 时继续探索。
 - `rho>=50` 且少数类足够时，以 5--10 个固定 seed 下采样等量多数类形成多组平衡 demonstrations，并平均各组 Qwen 概率；`rho<50` 时选择一组固定平衡 demonstrations。validation 始终保持原分布并只用于方案/阈值选择，禁止训练 LR。

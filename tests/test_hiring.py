@@ -36,6 +36,7 @@ def test_prepare_and_evaluate(run):
     ("cascade", "backend 必须是 `lr_qwen_cascade`"),
     ("paper_skill", "output/sampling_trace.json"),
     ("paper_skill_lr", "backend 必须是 `embedding_lr_paper_skill`"),
+    ("paper_skill_qwen_online", "backend 必须是 `qwen_online_lora`"),
     ("combined", "同时执行 paper_skill sampling 与 LR→Qwen cascade"),
 ])
 def test_prepare_proxy_variants(source, tmp_path, variant, marker):
@@ -65,6 +66,16 @@ def test_paper_skill_lr_requires_paper_proxy_guards(source, tmp_path):
     assert "1:1、1:3、1:5" in prompt
     assert "纯 proxy" in prompt
     assert "Adaptive Proxy Selection" in prompt
+
+
+def test_online_qwen_variant_forces_shared_trainer(source, tmp_path):
+    run = tmp_path / "paper_skill_qwen_online"
+    prepare(source, run, proxy_variant="paper_skill_qwen_online")
+    prompt = (run / "workspace/prompt.md").read_text(encoding="utf-8")
+    assert "python -m okagent.qwen_online_trainer" in prompt
+    assert "qwen_online_lora" in prompt
+    assert "一旦两类出现" in prompt
+    assert "禁止 LR" in prompt
 
 
 def test_unknown_proxy_variant_fails_before_creating_run(source, tmp_path):

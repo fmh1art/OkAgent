@@ -65,6 +65,15 @@ PROXY_VARIANT_INSTRUCTIONS = {
 - 阈值在原分布 validation 上选择：满足 recall>=0.9 的阈值中最大化 precision，再以较少预测正例和较高阈值打破平局。validation 为零正例或正例过少时报告不可稳定校准；无方案达标则 `proxy_valid=false`。按论文 Adaptive Proxy Selection，只有 proxy_valid=true 才部署，否则回退/失败，禁止伪称 Recall 保证。
 - 必须分别报告缓存覆盖前的纯 proxy 与覆盖后的 hybrid 指标，并报告 validation 正例数、预测正例比例、Random/AL 命中率、各训练方案指标和 embedding 缺失/维度检查。`proxy.pkl` backend 必须是 `embedding_lr_paper_skill`，保存 scaler、模型/集成、精确阈值、feature SQL/hash、累计训练 ID/标签统计、采样轨迹、固定 seeds 和 proxy_valid。
 """,
+    "paper_skill_qwen_online": """## 本实验变体：paper_skill_qwen_online（论文式主动学习 + 在线训练 Qwen；以下规则替代上文全部 proxy 规则）
+- 唯一 proxy model 是调用者传入的本地小型 Qwen，默认 `Qwen/Qwen3-0.6B`。必须使用仓库提供的 `python -m okagent.qwen_online_trainer` 训练和评分；禁止 LR、TF-IDF、Qwen embedding + LR、远程 Qwen、未训练的 Qwen direct 或任何静默回退。
+- 固定随机验证集保持总体原始分布，与训练和主动采样严格互斥。Random 冷启动只持续到训练标签同时出现两类；一旦两类出现，即使少数类不足 10，也必须立即在线训练 Qwen。少数类数量只影响部署可信度，不得作为推迟训练或主动学习的理由。
+- 每轮把所有成功训练标签按 candidate_id 去重合并，训练器在完整累计数据上继续训练上轮 adapter。训练使用类别加权损失；可比较仅作用于训练集的多数类下采样，但验证集不得下采样或参与训练。
+- 按论文思路执行主动学习：使用当前已训练 Qwen 为全部未标注训练池评分，优先从预测少数类 stratum 采样；每轮标注后重新训练、重新评分。连续两轮少数类命中率没有改善时允许暂时回到 Random 探索。
+- 训练、主动采样、验证和部署必须调用训练器中的同一文本构造、tokenizer、最大长度和 score 函数。Qwen 权重或 adapter 加载、训练、评分失败时实验必须失败，不能改用其他模型。
+- 在原分布 validation 上选择满足 recall>=0.9 且 precision 最高的阈值；无可靠正例或无方案达标时设置 `proxy_valid=false`。全库部署后再用 cached_labels() 覆盖已查询真值，并分别报告纯 Qwen proxy 和覆盖后的 hybrid 指标。
+- `proxy.pkl` backend 必须是 `qwen_online_lora`，记录基础模型、adapter 路径、累计训练 ID/标签统计、训练配置、验证指标、精确阈值和 proxy_valid。每轮记录 Random/AL 策略、样本 ID、标签分布、少数类命中率和类别不平衡变化。
+""",
     "combined": """## 本实验变体：combined（以下规则替代上文 Qwen-only 部署，同时执行 paper_skill sampling 与 LR→Qwen cascade）
 - 使用论文式 AL：固定总体分布 validation 不下采样；Random 冷启动后由当前 proxy 识别预测少数类，后续批次只从预测少数类 stratum 取样，每轮累计合并全部训练标签并重训。记录 strategy、stratum、样本 ID、少数类命中率和 rho_before/rho_after 到 `output/sampling_trace.json`；禁止用旧的 50/20/15/15 混合作为 AL。
 - `rho>=50` 且少数类足够时，以 5--10 个固定 seed 下采样等量多数类形成多组平衡 demonstrations，并平均各组 Qwen 概率；`rho<50` 时选择一组固定平衡 demonstrations。validation 始终保持原分布并只用于方案/阈值选择，禁止训练 LR。

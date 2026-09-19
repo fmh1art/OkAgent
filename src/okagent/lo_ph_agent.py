@@ -1,5 +1,8 @@
 """Logical functions delegate physical execution to fresh agents in one workspace."""
 import json
+import re
+import subprocess
+import sys
 from pathlib import Path
 from uuid import uuid4
 
@@ -85,6 +88,7 @@ class LogicalOperators:
         if type(step_limit) is not int or step_limit <= 0 or command_timeout <= 0:
             raise ValueError("step_limit and command_timeout must be positive")
         self.workspace = Path(workspace).resolve()
+        self.command_timeout = command_timeout
         self.model_factory = model_factory or make_model
         self.step_limit = step_limit
         self.env = make_environment(self.workspace, command_timeout)
@@ -102,6 +106,42 @@ class LogicalOperators:
         if not path.is_file():
             raise FileNotFoundError(name)
         return path
+
+    def _run_qwen_proxy(self, inputs, instruction, relative, directory):
+        from .qwen_online_trainer import DEFAULT_MODEL
+
+        match = re.search(r"\b(?:model_name|model)\s*[:=]\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)", instruction)
+        model_name = match.group(1) if match else DEFAULT_MODEL
+        train = [value for key, value in sorted(inputs.items())
+                 if key == "train" or key.startswith("train_round_")]
+        if not train:
+            raise ValueError("online Qwen proxy requires at least one train table")
+        command = [sys.executable, "-m", "okagent.qwen_online_trainer", "fit",
+                   "--workspace", str(self.workspace), "--model-name", model_name,
+                   "--validation", inputs["validation"], "--output-dir", relative,
+                   "--device", "cuda", "--seed", "42"]
+        for value in train:
+            command.extend(("--train", value))
+        if "previous_model" in inputs:
+            command.extend(("--previous-artifact", inputs["previous_model"]))
+        (directory / "implementation.py").write_text(
+            "import subprocess\nimport sys\n" +
+            f"subprocess.run({command!r}, check=True)\n", encoding="utf-8")
+        with (directory / "training.log").open("w", encoding="utf-8") as log:
+            subprocess.run([sys.executable, str(directory / "implementation.py")],
+                           cwd=self.workspace, stdout=log, stderr=subprocess.STDOUT,
+                           timeout=self.command_timeout, check=True)
+        metadata = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
+        artifacts = {key: f"{relative}/{name}" for key, name in (
+            ("model", "proxy.pkl"), ("cumulative_train", "cumulative_train.json"),
+            ("validation_scores", "validation_scores.json"), ("metadata", "metadata.json"))}
+        artifacts["adapter"] = f"{relative}/adapter"
+        write_json(directory / "result.json", {"artifacts": artifacts,
+            "summary": f"Trained {model_name} LoRA on {metadata['train_count']} labeled resumes; "
+                       f"validation positives={metadata['validation_positive']}; "
+                       f"proxy_valid={metadata['proxy_valid']}; backend=qwen_online_lora."})
+        write_json(directory / "trajectory.json", {"info": {"exit_status": "Submitted",
+                   "runner": "deterministic qwen_online_trainer", "command": command}})
 
     def _execute(self, operator, inputs, instruction):
         if not isinstance(inputs, dict) or not REQUIRED_INPUTS[operator].issubset(inputs):
@@ -129,12 +169,16 @@ class LogicalOperators:
                 f"保存 {relative}/implementation.py，实际执行并自检。保存 {relative}/result.json，格式为：\n"
                 '{"artifacts": {"输出名称": "工作区相对路径"}, "summary": "方法、实际统计、自检结果及局限"}\n'
                 "所有 artifacts 必须是本次产物目录内实际生成的文件；online Qwen 的 adapter 可为目录。确认成功后再提交。")
-        if self.proxy_variant == "paper_skill_qwen_online":
-            self.env.config.env.update(OKAGENT_LABEL_ONLY_OPERATOR="1", OKAGENT_OPERATOR=operator)
-        agent = DefaultAgent(self.model_factory(), self.env, system_template=self.physical_prompt,
-                             instance_template="{{ task }}", step_limit=self.step_limit, cost_limit=0,
-                             output_path=directory / "trajectory.json")
-        status = agent.run(task)
+        if operator == "proxy" and self.proxy_variant == "paper_skill_qwen_online":
+            self._run_qwen_proxy(inputs, instruction, relative, directory)
+            status = {"exit_status": "Submitted"}
+        else:
+            if self.proxy_variant == "paper_skill_qwen_online":
+                self.env.config.env.update(OKAGENT_LABEL_ONLY_OPERATOR="1", OKAGENT_OPERATOR=operator)
+            agent = DefaultAgent(self.model_factory(), self.env, system_template=self.physical_prompt,
+                                 instance_template="{{ task }}", step_limit=self.step_limit, cost_limit=0,
+                                 output_path=directory / "trajectory.json")
+            status = agent.run(task)
         if status.get("exit_status") != "Submitted":
             raise RuntimeError(f"{operator}: {status.get('exit_status')}; see {relative}/trajectory.json")
         if not (directory / "implementation.py").is_file():

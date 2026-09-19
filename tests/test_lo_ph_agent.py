@@ -21,6 +21,33 @@ def test_online_qwen_proxy_requires_labeled_validation(run):
         operators.proxy({"train": "train.json"}, "Train online Qwen")
 
 
+def test_online_qwen_proxy_uses_fixed_trainer_command(run, monkeypatch):
+    import okagent.lo_ph_agent as module
+    workspace = run / "workspace"
+    operators = LogicalOperators(workspace, proxy_variant="paper_skill_qwen_online")
+    (workspace / "operators/proxy-test").mkdir(parents=True)
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        target = workspace / "operators/proxy-test"
+        write_json(target / "metadata.json", {"train_count": 5,
+                   "validation_positive": 2, "proxy_valid": False})
+        return None
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    operators._run_qwen_proxy({"train": "train.json", "train_round_1": "round.json",
+                              "validation": "validation.json"},
+                             "model_name=Qwen/Qwen3-0.6B", "operators/proxy-test",
+                             workspace / "operators/proxy-test")
+    script = (workspace / "operators/proxy-test/implementation.py").read_text()
+    assert "Qwen/Qwen3-0.6B" in script
+    assert "--train', 'train.json', '--train', 'round.json'" in script
+    assert len(calls) == 1
+    result = json.loads((workspace / "operators/proxy-test/result.json").read_text())
+    assert result["artifacts"]["adapter"] == "operators/proxy-test/adapter"
+
+
 def tool(name, arguments):
     return {"role": "assistant", "content": "planner-only-marker" if name != "bash" else "Implement this operator",
             "tool_calls": [{"id": "test-call", "type": "function",

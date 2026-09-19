@@ -89,6 +89,7 @@ class LogicalOperators:
         self.env = make_environment(self.workspace, command_timeout)
         self.semantic = SemanticOperator(self.workspace)
         self.completed = []
+        self.proxy_variant = proxy_variant
         self.physical_prompt = PHYSICAL_PROMPT + proxy_variant_instruction(proxy_variant)
 
     def _path(self, name):
@@ -141,6 +142,27 @@ class LogicalOperators:
                     json.loads(path.read_text(encoding="utf-8"))
                 except json.JSONDecodeError as error:
                     raise ValueError(f"{name}: write one JSON value with json.dump, not JSONL") from error
+        if operator == "proxy" and self.proxy_variant == "paper_skill_qwen_online":
+            model_path = self._path(artifacts["model"])
+            metadata_path = model_path.with_name("metadata.json")
+            if not metadata_path.is_file():
+                raise ValueError("online Qwen proxy requires trainer metadata.json next to proxy.pkl")
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if metadata.get("backend") != "qwen_online_lora":
+                raise ValueError("online Qwen proxy backend must be qwen_online_lora")
+            adapter_name = metadata.get("adapter_path")
+            if not isinstance(adapter_name, str) or Path(adapter_name).is_absolute() or ".." in Path(adapter_name).parts:
+                raise ValueError("online Qwen proxy adapter path must be workspace-relative")
+            adapter = (self.workspace / adapter_name).resolve()
+            adapter.relative_to(directory.resolve())
+            if not adapter.is_dir() or not (adapter / "adapter_model.safetensors").is_file():
+                raise ValueError("online Qwen proxy adapter is missing")
+            from .qwen_online_trainer import merge_labels
+            merged = merge_labels([self._path(value) for key, value in inputs.items()
+                                   if key == "train" or key.startswith("train_round_")])
+            if metadata.get("train_count") != len(merged) or metadata.get("train_positive") != sum(
+                    row["label"] for row in merged):
+                raise ValueError("online Qwen proxy did not train on all input label rounds")
         if operator == "label":
             if inputs["table"] == "data.duckdb":
                 with duckdb.connect(str(self.workspace / "data.duckdb"), read_only=True) as con:

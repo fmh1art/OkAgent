@@ -1,4 +1,5 @@
 import json
+import pickle
 import re
 import shlex
 
@@ -46,6 +47,15 @@ def test_online_qwen_proxy_uses_fixed_trainer_command(run, monkeypatch):
     assert len(calls) == 1
     result = json.loads((workspace / "operators/proxy-test/result.json").read_text())
     assert result["artifacts"]["adapter"] == "operators/proxy-test/adapter"
+
+
+def test_online_qwen_cannot_deploy_before_active_retraining(run):
+    workspace = run / "workspace"
+    (workspace / "early.pkl").write_bytes(pickle.dumps({"backend": "qwen_online_lora",
+                                                     "train_count": 100}))
+    operators = LogicalOperators(workspace, proxy_variant="paper_skill_qwen_online")
+    with pytest.raises(ValueError, match="active learning and online retraining"):
+        operators.deploy({"table": "data.duckdb", "model": "early.pkl"}, "Deploy")
 
 
 def tool(name, arguments):

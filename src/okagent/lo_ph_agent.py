@@ -1,5 +1,6 @@
 """Logical functions delegate physical execution to fresh agents in one workspace."""
 import json
+import pickle
 import re
 import subprocess
 import sys
@@ -150,6 +151,15 @@ class LogicalOperators:
             raise ValueError("instruction must specify the method and parameters")
         for name in inputs.values():
             self._path(name)
+        if operator == "deploy" and self.proxy_variant == "paper_skill_qwen_online":
+            artifact = pickle.loads(self._path(inputs["model"]).read_bytes())
+            required = int(self.semantic.usage()["max_calls"] * 0.75)
+            if artifact.get("backend") != "qwen_online_lora":
+                raise ValueError("online Qwen deploy requires a Qwen LoRA proxy")
+            if artifact.get("train_count", 0) < required or sum(
+                    item["operator"] == "proxy" for item in self.completed) < 2:
+                raise ValueError(f"Continue minority-stratum active learning and online retraining before deploy: "
+                                 f"need at least {required} cumulative training labels and two Qwen fits")
         if operator == "proxy" and self.proxy_variant == "paper_skill_qwen_online":
             if "validation" not in inputs:
                 raise ValueError("online Qwen proxy requires a separately labeled validation input")

@@ -128,7 +128,7 @@ class LogicalOperators:
                 f"算子契约：{CONTRACTS[operator]}\n产物目录：{relative}\n"
                 f"保存 {relative}/implementation.py，实际执行并自检。保存 {relative}/result.json，格式为：\n"
                 '{"artifacts": {"输出名称": "工作区相对路径"}, "summary": "方法、实际统计、自检结果及局限"}\n'
-                "所有 artifacts 必须是本次产物目录内实际生成的文件。确认成功后再提交。")
+                "所有 artifacts 必须是本次产物目录内实际生成的文件；online Qwen 的 adapter 可为目录。确认成功后再提交。")
         if self.proxy_variant == "paper_skill_qwen_online":
             self.env.config.env.update(OKAGENT_LABEL_ONLY_OPERATOR="1", OKAGENT_OPERATOR=operator)
         agent = DefaultAgent(self.model_factory(), self.env, system_template=self.physical_prompt,
@@ -147,7 +147,15 @@ class LogicalOperators:
             raise ValueError(f"{relative}/result.json: summary must be a JSON string, not an object; serialize statistics separately")
         if operator in REQUIRED_OUTPUT and REQUIRED_OUTPUT[operator] not in artifacts:
             raise ValueError(f"{operator} must return artifacts.{REQUIRED_OUTPUT[operator]}")
-        for name in artifacts.values():
+        for key, name in artifacts.items():
+            if operator == "proxy" and self.proxy_variant == "paper_skill_qwen_online" and key == "adapter":
+                if not isinstance(name, str) or Path(name).is_absolute() or ".." in Path(name).parts:
+                    raise ValueError("online Qwen adapter artifact must be workspace-relative")
+                path = (self.workspace / name).resolve()
+                path.relative_to(directory.resolve())
+                if not path.is_dir():
+                    raise FileNotFoundError(name)
+                continue
             path = self._path(name).resolve()
             path.relative_to(directory.resolve())
             if path.suffix == ".json":

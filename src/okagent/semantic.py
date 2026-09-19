@@ -48,6 +48,8 @@ class SemanticOperator:
                     remaining=max(0, self.settings["max_calls"] - calls))
 
     def label(self, candidate_id: str) -> int:
+        if os.environ.get("OKAGENT_LABEL_ONLY_OPERATOR") == "1" and os.environ.get("OKAGENT_OPERATOR") != "label":
+            raise RuntimeError("Only the label operator may query teacher labels in this experiment")
         if not isinstance(candidate_id, str):
             raise ValueError("candidate_id must be a string")
         # Deduplicate the same person across processes without serializing independent requests.

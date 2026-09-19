@@ -67,7 +67,7 @@ PROXY_VARIANT_INSTRUCTIONS = {
 """,
     "paper_skill_qwen_online": """## 本实验变体：paper_skill_qwen_online（论文式主动学习 + 在线训练 Qwen；以下规则替代上文全部 proxy 规则）
 - 唯一 proxy model 是调用者传入的本地小型 Qwen，默认 `Qwen/Qwen3-0.6B`。必须使用仓库提供的 `python -m okagent.qwen_online_trainer` 训练和评分；禁止 LR、TF-IDF、Qwen embedding + LR、远程 Qwen、未训练的 Qwen direct 或任何静默回退。
-- 固定随机验证集保持总体原始分布，与训练和主动采样严格互斥。Random 冷启动只持续到训练标签同时出现两类；一旦两类出现，即使少数类不足 10，也必须立即在线训练 Qwen。少数类数量只影响部署可信度，不得作为推迟训练或主动学习的理由。
+- 固定随机验证池保持总体原始分布，与训练和主动采样严格互斥；在标注预算内先从验证池抽取约 20% 预算的样本并经独立 label 算子标注。proxy 算子必须收到已标注的 validation 表，禁止在 proxy/sample/deploy 算子内调用 SemanticOperator.label/label_many；绝不能逐个标注整个验证池。Random 冷启动只持续到训练标签同时出现两类；一旦两类出现，即使少数类不足 10，也必须立即在线训练 Qwen。少数类数量只影响部署可信度，不得作为推迟训练或主动学习的理由。
 - 每轮把所有成功训练标签按 candidate_id 去重合并，训练器在完整累计数据上继续训练上轮 adapter。训练使用类别加权损失；可比较仅作用于训练集的多数类下采样，但验证集不得下采样或参与训练。
 - 按论文思路执行主动学习：使用当前已训练 Qwen 为全部未标注训练池评分，优先从预测少数类 stratum 采样；每轮标注后重新训练、重新评分。连续两轮少数类命中率没有改善时允许暂时回到 Random 探索。
 - 训练、主动采样、验证和部署必须调用训练器中的同一文本构造、tokenizer、最大长度和 score 函数。Qwen 权重或 adapter 加载、训练、评分失败时实验必须失败，不能改用其他模型。

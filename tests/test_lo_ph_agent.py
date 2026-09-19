@@ -13,6 +13,14 @@ from okagent.lo_ph_agent import LogicalOperators, run_lo_ph_agent
 from test_agent import judgment, llm
 
 
+def test_online_qwen_proxy_requires_labeled_validation(run):
+    workspace = run / "workspace"
+    write_json(workspace / "train.json", [{"candidate_id": "a", "label": 1}])
+    operators = LogicalOperators(workspace, proxy_variant="paper_skill_qwen_online")
+    with pytest.raises(ValueError, match="separately labeled validation"):
+        operators.proxy({"train": "train.json"}, "Train online Qwen")
+
+
 def tool(name, arguments):
     return {"role": "assistant", "content": "planner-only-marker" if name != "bash" else "Implement this operator",
             "tool_calls": [{"id": "test-call", "type": "function",

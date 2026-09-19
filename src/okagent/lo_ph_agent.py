@@ -53,6 +53,7 @@ Deploy 根据 artifact backend 恢复 Qwen direct、在线训练 Qwen、LR→Qwe
 阈值按 precision_recall_curve 的升序 thresholds 取 np.flatnonzero(recall[:-1] >= 0.9)[-1]；若自行按分数降序累计召回，则取第一个达标位置，不能取最后一个。自检没有更大的合格阈值。
 result.json 的 summary 必须为字符串；统计对象另存文件。table.json 必须用 json.dump(rows, f) 保存一个 JSON 数组，禁止 JSONL。
 Label 必须覆盖全部输入 ID；失败后可复用缓存补齐，不能把部分标注表当作成功结果。无法补齐时明确失败。
+paper_skill_qwen_online 变体下只有 label 算子可调用 SemanticOperator.label/label_many；proxy 只能读取已标注的 validation 输入，不能自行标注完整验证池。
 提交前实际 json.load 所有 JSON 产物，assert isinstance(result['summary'], str)，检查输入 ID 和输出 ID 完全一致（采样/部署按各自契约）。
 遇到不成立的前提或预算不足，应报告失败，不能伪造标签、指标或空产物宣称成功。
 """ + PROXY_SKILL
@@ -109,6 +110,16 @@ class LogicalOperators:
             raise ValueError("instruction must specify the method and parameters")
         for name in inputs.values():
             self._path(name)
+        if operator == "proxy" and self.proxy_variant == "paper_skill_qwen_online":
+            if "validation" not in inputs:
+                raise ValueError("online Qwen proxy requires a separately labeled validation input")
+            validation_rows = json.loads(self._path(inputs["validation"]).read_text(encoding="utf-8"))
+            cache = self.semantic.cached_labels()
+            if (not isinstance(validation_rows, list) or not validation_rows or
+                    any(not isinstance(row, dict) or not isinstance(row.get("candidate_id"), str) or
+                        type(row.get("label")) is not int or row["label"] not in (0, 1) or
+                        cache.get(row["candidate_id"]) != row["label"] for row in validation_rows)):
+                raise ValueError("online Qwen validation must contain successful labeled rows")
         relative = f"operators/{operator}-{uuid4().hex[:12]}"
         directory = self.workspace / relative
         directory.mkdir(parents=True)
@@ -118,6 +129,8 @@ class LogicalOperators:
                 f"保存 {relative}/implementation.py，实际执行并自检。保存 {relative}/result.json，格式为：\n"
                 '{"artifacts": {"输出名称": "工作区相对路径"}, "summary": "方法、实际统计、自检结果及局限"}\n'
                 "所有 artifacts 必须是本次产物目录内实际生成的文件。确认成功后再提交。")
+        if self.proxy_variant == "paper_skill_qwen_online":
+            self.env.config.env.update(OKAGENT_LABEL_ONLY_OPERATOR="1", OKAGENT_OPERATOR=operator)
         agent = DefaultAgent(self.model_factory(), self.env, system_template=self.physical_prompt,
                              instance_template="{{ task }}", step_limit=self.step_limit, cost_limit=0,
                              output_path=directory / "trajectory.json")

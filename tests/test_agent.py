@@ -19,6 +19,15 @@ from okagent.evaluation import evaluate
 from okagent.semantic import BudgetExceeded, SemanticOperator
 
 
+def test_teacher_label_only_allowed_in_label_operator(run, monkeypatch):
+    operator = SemanticOperator(run / "workspace")
+    monkeypatch.setenv("OKAGENT_LABEL_ONLY_OPERATOR", "1")
+    monkeypatch.setenv("OKAGENT_OPERATOR", "proxy")
+    with pytest.raises(RuntimeError, match="Only the label operator"):
+        operator.label("a")
+    assert operator.usage()["llm_calls"] == 0
+
+
 @pytest.fixture
 def llm(monkeypatch):
     requests, replies = [], deque()

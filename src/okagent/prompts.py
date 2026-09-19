@@ -71,7 +71,7 @@ PROXY_VARIANT_INSTRUCTIONS = {
 - 每轮把所有成功训练标签按 candidate_id 去重合并，训练器在完整累计数据上继续训练上轮 adapter。训练使用类别加权损失；可比较仅作用于训练集的多数类下采样，但验证集不得下采样或参与训练。
 - 按论文思路执行主动学习：使用当前已训练 Qwen 为全部未标注训练池评分，优先从预测少数类 stratum 采样；每轮标注后重新训练、重新评分。连续两轮少数类命中率没有改善时允许暂时回到 Random 探索。
 - 训练、主动采样、验证和部署必须调用训练器中的同一文本构造、tokenizer、最大长度和 score 函数。Qwen 权重或 adapter 加载、训练、评分失败时实验必须失败，不能改用其他模型。
-- 在原分布 validation 上选择满足 recall>=0.9 且 precision 最高的阈值；无可靠正例或无方案达标时设置 `proxy_valid=false`。全库部署后再用 cached_labels() 覆盖已查询真值，并分别报告纯 Qwen proxy 和覆盖后的 hybrid 指标。
+- 在原分布 validation 上选择满足 recall>=0.9 且 precision 最高的阈值；验证正例不足 3 个或无方案达标时设置 `proxy_valid=false`，3 个只是最低部署门槛，仍须报告估计不稳定。全库部署后再用 cached_labels() 覆盖已查询真值，并分别报告纯 Qwen proxy 和覆盖后的 hybrid 指标。
 - `proxy.pkl` backend 必须是 `qwen_online_lora`，记录基础模型、adapter 路径、累计训练 ID/标签统计、训练配置、验证指标、精确阈值和 proxy_valid。每轮记录 Random/AL 策略、样本 ID、标签分布、少数类命中率和类别不平衡变化。
 """,
     "combined": """## 本实验变体：combined（以下规则替代上文 Qwen-only 部署，同时执行 paper_skill sampling 与 LR→Qwen cascade）

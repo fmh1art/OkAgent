@@ -122,12 +122,12 @@ def load_model(model_name: str, *, adapter: Path | None, trainable: bool, device
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but CUDA PyTorch is unavailable")
     dtype = torch.bfloat16 if device == "cuda" and torch.cuda.is_bf16_supported() else torch.float32
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True, local_files_only=True)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
     base = AutoModelForSequenceClassification.from_pretrained(
-        model_name, num_labels=2, torch_dtype=dtype,
+        model_name, num_labels=2, dtype=dtype, local_files_only=True,
     )
     base.config.pad_token_id = tokenizer.pad_token_id
     if adapter is None:
@@ -221,11 +221,14 @@ def score_rows(*, workspace: Path, rows: list[dict], model_name: str, adapter: P
     return output
 
 
-def select_threshold(labels: list[int], scores: list[float], target_recall: float):
+def select_threshold(labels: list[int], scores: list[float], target_recall: float,
+                     min_validation_positive: int = 3):
     from sklearn.metrics import precision_recall_curve
 
-    if len(set(labels)) < 2 or sum(labels) == 0:
-        return None, {"proxy_valid": False, "reason": "validation must contain both classes"}
+    if len(set(labels)) < 2 or sum(labels) < min_validation_positive:
+        return None, {"proxy_valid": False,
+                      "reason": f"validation needs both classes and at least {min_validation_positive} positives",
+                      "validation_positive": sum(labels)}
     precision, recall, thresholds = precision_recall_curve(labels, scores)
     eligible = [index for index in range(len(thresholds)) if recall[index] >= target_recall]
     if not eligible:
@@ -285,6 +288,7 @@ def fit(args):
     threshold, metrics = select_threshold(
         [row["label"] for row in validation_rows],
         [row["score"] for row in validation_scores], args.target_recall,
+        args.min_validation_positive,
     )
     _write_json(output / "cumulative_train.json", train_labels)
     _write_json(output / "validation_scores.json", validation_scores)
@@ -296,6 +300,7 @@ def fit(args):
         "threshold": threshold,
         "proxy_valid": bool(metrics["proxy_valid"]),
         "target_recall": args.target_recall,
+        "min_validation_positive": args.min_validation_positive,
         "train_count": len(train_rows),
         "train_positive": sum(row["label"] for row in train_rows),
         "validation_count": len(validation_rows),
@@ -344,6 +349,7 @@ def parser():
     fit_parser.add_argument("--epochs", type=int, default=2)
     fit_parser.add_argument("--learning-rate", type=float, default=2e-4)
     fit_parser.add_argument("--target-recall", type=float, default=0.9)
+    fit_parser.add_argument("--min-validation-positive", type=int, default=3)
     fit_parser.add_argument("--seed", type=int, default=42)
     fit_parser.set_defaults(func=fit)
     score_parser = sub.add_parser("score")

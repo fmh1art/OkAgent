@@ -99,19 +99,20 @@ def build_text(context: str, resume: str) -> str:
 
 def resume_chunks(tokenizer, context: str, resume: str, max_length: int) -> list[list[int]]:
     """Encode every resume token exactly once, repeating job context per chunk."""
+    add_special = getattr(tokenizer, "build_inputs_with_special_tokens", None)
+    wrap = add_special if callable(add_special) else lambda ids: ids
     prefix, suffix = _prompt_parts(context)
     prefix_ids = tokenizer(prefix, add_special_tokens=False, truncation=False)["input_ids"]
     suffix_ids = tokenizer(suffix, add_special_tokens=False, truncation=False)["input_ids"]
     resume_ids = tokenizer(resume, add_special_tokens=False, truncation=False)["input_ids"]
-    special_count = len(tokenizer.build_inputs_with_special_tokens([]))
+    special_count = len(wrap([]))
     capacity = max_length - len(prefix_ids) - len(suffix_ids) - special_count
     if capacity <= 0:
         raise ValueError(f"max_length={max_length} cannot fit the job prompt and classification suffix")
     parts = [resume_ids[start:start + capacity] for start in range(0, len(resume_ids), capacity)]
     if not parts:
         parts = [[]]
-    chunks = [tokenizer.build_inputs_with_special_tokens(prefix_ids + part + suffix_ids)
-              for part in parts]
+    chunks = [wrap(prefix_ids + part + suffix_ids) for part in parts]
     if any(len(chunk) > max_length for chunk in chunks):
         raise AssertionError("resume chunk exceeded max_length")
     return chunks

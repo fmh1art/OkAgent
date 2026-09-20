@@ -41,6 +41,15 @@ def test_resume_chunks_cover_every_token_without_truncation():
     with pytest.raises(ValueError, match="cannot fit"):
         resume_chunks(tokenizer, context, resume, prefix_size + suffix_size + 2)
 
+    class NoSpecialBuilder:
+        def __call__(self, value, **kwargs):
+            return tokenizer(value, **kwargs)
+
+    plain = resume_chunks(NoSpecialBuilder(), context, resume,
+                          prefix_size + suffix_size + 4)
+    assert len(plain) == 4
+    assert all(len(chunk) <= prefix_size + suffix_size + 4 for chunk in plain)
+
 
 def test_merge_labels_deduplicates_and_rejects_conflicts(tmp_path):
     first = tmp_path / "first.json"

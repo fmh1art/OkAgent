@@ -88,8 +88,14 @@ def run(run_dir, model_name):
     first_meta = _read(first / "metadata.json")
     if first_meta["model_name"] != model_name or not first_meta["proxy_valid"]:
         raise ValueError("initial Qwen proxy is invalid or uses the wrong model")
-    pool = [cid for cid in universe if cid not in validation_pool and cid not in cached]
-    write_json(output / "unlabeled_pool.json", pool)
+    pool_path = output / "unlabeled_pool.json"
+    if pool_path.exists():
+        pool = _read(pool_path)
+        if len(pool) != len(set(pool)) or not set(pool).issubset(set(universe) - validation_pool):
+            raise ValueError("saved training pool has duplicate, unknown, or validation IDs")
+    else:
+        pool = [cid for cid in universe if cid not in validation_pool and cid not in cached]
+        write_json(pool_path, pool)
     pool_scores_path = output / "round_0_pool_scores.json"
     if not pool_scores_path.exists():
         _trainer(workspace, "score", "--artifact", first / "proxy.pkl",

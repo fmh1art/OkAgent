@@ -15,6 +15,7 @@ from pathlib import Path
 
 BACKEND = "qwen_online_lora"
 DEFAULT_MODEL = "Qwen/Qwen3-0.6B"
+TEXT_POLICY = "full_unstructured_chunks_v1"
 
 
 def _read_json(path: Path):
@@ -59,22 +60,20 @@ def load_resume_texts(workspace: Path, ids: list[str]) -> dict[str, str]:
     import duckdb
 
     wanted = set(ids)
-    texts: dict[str, str] = {}
+    parts: dict[str, list[str]] = {}
     with duckdb.connect(str(workspace / "data.duckdb"), read_only=True) as con:
         rows = con.execute(
             "SELECT candidate_id, text FROM candidate_segments "
-            "WHERE segment='unstructured' ORDER BY candidate_id"
+            "WHERE segment='unstructured' ORDER BY candidate_id, text"
         ).fetchall()
     for cid, value in rows:
         if cid not in wanted:
             continue
-        if cid in texts:
-            raise ValueError(f"multiple unstructured rows for {cid}")
-        texts[cid] = value or ""
-    missing = wanted - texts.keys()
+        parts.setdefault(cid, []).append(value or "")
+    missing = wanted - parts.keys()
     if missing:
         raise ValueError(f"missing unstructured text for {len(missing)} candidates")
-    return texts
+    return {cid: "\n\n".join(values) for cid, values in parts.items()}
 
 
 def job_context(workspace: Path) -> str:
@@ -88,11 +87,34 @@ def job_context(workspace: Path) -> str:
     )
 
 
+def _prompt_parts(context: str) -> tuple[str, str]:
+    return ("你是招聘匹配分类器。根据岗位必须条件判断候选人是否匹配。\n"
+            f"{context}\n\n候选人简历：\n", "\n\n输出匹配类别。")
+
+
 def build_text(context: str, resume: str) -> str:
-    return (
-        "你是招聘匹配分类器。根据岗位必须条件判断候选人是否匹配。\n"
-        f"{context}\n\n候选人简历：\n{resume}\n\n输出匹配类别。"
-    )
+    prefix, suffix = _prompt_parts(context)
+    return prefix + resume + suffix
+
+
+def resume_chunks(tokenizer, context: str, resume: str, max_length: int) -> list[list[int]]:
+    """Encode every resume token exactly once, repeating job context per chunk."""
+    prefix, suffix = _prompt_parts(context)
+    prefix_ids = tokenizer(prefix, add_special_tokens=False, truncation=False)["input_ids"]
+    suffix_ids = tokenizer(suffix, add_special_tokens=False, truncation=False)["input_ids"]
+    resume_ids = tokenizer(resume, add_special_tokens=False, truncation=False)["input_ids"]
+    special_count = len(tokenizer.build_inputs_with_special_tokens([]))
+    capacity = max_length - len(prefix_ids) - len(suffix_ids) - special_count
+    if capacity <= 0:
+        raise ValueError(f"max_length={max_length} cannot fit the job prompt and classification suffix")
+    parts = [resume_ids[start:start + capacity] for start in range(0, len(resume_ids), capacity)]
+    if not parts:
+        parts = [[]]
+    chunks = [tokenizer.build_inputs_with_special_tokens(prefix_ids + part + suffix_ids)
+              for part in parts]
+    if any(len(chunk) > max_length for chunk in chunks):
+        raise AssertionError("resume chunk exceeded max_length")
+    return chunks
 
 
 def _seed_everything(seed: int):
@@ -168,20 +190,31 @@ def train_adapter(*, workspace: Path, rows: list[dict], model_name: str, output:
         raise RuntimeError("LoRA model has no trainable parameters")
     optimizer = torch.optim.AdamW(params, lr=learning_rate)
     context = job_context(workspace)
+    chunks = []
+    chunks_per_candidate = {}
+    for row in rows:
+        encoded_chunks = resume_chunks(tokenizer, context, row["text"], max_length)
+        chunks_per_candidate[row["candidate_id"]] = len(encoded_chunks)
+        chunks.extend({"candidate_id": row["candidate_id"], "label": row["label"],
+                       "input_ids": ids, "candidate_weight": 1 / len(encoded_chunks)}
+                      for ids in encoded_chunks)
     model.train()
     losses = []
+    mean_chunks = len(chunks) / len(rows)
     for epoch in range(epochs):
-        for batch in _batches(rows, batch_size, shuffle=True, seed=seed + epoch):
-            encoded = tokenizer(
-                [build_text(context, row["text"]) for row in batch],
-                padding=True, truncation=True, max_length=max_length, return_tensors="pt",
-            ).to(device)
+        for batch in _batches(chunks, batch_size, shuffle=True, seed=seed + epoch):
+            encoded = tokenizer.pad({"input_ids": [row["input_ids"] for row in batch]},
+                                    padding=True, return_tensors="pt").to(device)
             labels = torch.tensor([row["label"] for row in batch], dtype=torch.long, device=device)
+            candidate_weights = torch.tensor([row["candidate_weight"] for row in batch],
+                                             dtype=torch.float32, device=device)
             optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device, dtype=torch.bfloat16,
                                 enabled=device == "cuda" and torch.cuda.is_bf16_supported()):
                 logits = model(**encoded).logits
-                loss = torch.nn.functional.cross_entropy(logits.float(), labels, weight=weights)
+                per_chunk = torch.nn.functional.cross_entropy(
+                    logits.float(), labels, weight=weights, reduction="none")
+                loss = (per_chunk * candidate_weights).sum() * mean_chunks / len(batch)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(params, 1.0)
             optimizer.step()
@@ -198,6 +231,10 @@ def train_adapter(*, workspace: Path, rows: list[dict], model_name: str, output:
         "mean_loss": sum(losses) / len(losses),
         "steps": len(losses),
         "trainable_parameters": sum(param.numel() for param in params),
+        "candidate_count": len(rows),
+        "chunk_count": len(chunks),
+        "max_chunks_per_candidate": max(chunks_per_candidate.values()),
+        "text_policy": TEXT_POLICY,
     }
 
 
@@ -208,17 +245,29 @@ def score_rows(*, workspace: Path, rows: list[dict], model_name: str, adapter: P
     )
     context = job_context(workspace)
     model.eval()
-    output = []
+    scores = {}
+    pending = []
+
+    def flush():
+        if not pending:
+            return
+        encoded = tokenizer.pad({"input_ids": [part["input_ids"] for part in pending]},
+                                padding=True, return_tensors="pt").to(device)
+        probabilities = torch.softmax(model(**encoded).logits.float(), dim=-1)[:, 1].cpu().tolist()
+        for part, probability in zip(pending, probabilities):
+            cid = part["candidate_id"]
+            scores[cid] = max(scores.get(cid, 0.0), float(probability))
+        pending.clear()
+
     with torch.inference_mode():
-        for batch in _batches(rows, batch_size, shuffle=False, seed=0):
-            encoded = tokenizer(
-                [build_text(context, row["text"]) for row in batch],
-                padding=True, truncation=True, max_length=max_length, return_tensors="pt",
-            ).to(device)
-            probabilities = torch.softmax(model(**encoded).logits.float(), dim=-1)[:, 1].cpu().tolist()
-            output.extend({"candidate_id": row["candidate_id"], "score": float(score)}
-                          for row, score in zip(batch, probabilities))
-    return output
+        for row in rows:
+            for ids in resume_chunks(tokenizer, context, row["text"], max_length):
+                pending.append({"candidate_id": row["candidate_id"], "input_ids": ids})
+                if len(pending) >= batch_size:
+                    flush()
+        flush()
+    return [{"candidate_id": row["candidate_id"], "score": scores[row["candidate_id"]]}
+            for row in rows]
 
 
 def select_threshold(labels: list[int], scores: list[float], target_recall: float,
@@ -270,8 +319,9 @@ def fit(args):
     previous_adapter = None
     if args.previous_artifact:
         previous = pickle.loads(_resolve(workspace, args.previous_artifact).read_bytes())
-        if previous.get("backend") != BACKEND or previous.get("model_name") != args.model_name:
-            raise ValueError("previous artifact backend/model does not match")
+        if (previous.get("backend") != BACKEND or previous.get("model_name") != args.model_name
+                or previous.get("text_policy") != TEXT_POLICY):
+            raise ValueError("previous artifact backend/model/text policy does not match")
         previous_adapter = _resolve(workspace, previous["adapter_path"])
     _seed_everything(args.seed)
     adapter = output / "adapter"
@@ -295,6 +345,8 @@ def fit(args):
     artifact = {
         "backend": BACKEND,
         "model_name": args.model_name,
+        "text_policy": TEXT_POLICY,
+        "chunk_aggregation": "max_probability",
         "adapter_path": str(adapter.relative_to(workspace)),
         "max_length": args.max_length,
         "threshold": threshold,
@@ -318,8 +370,8 @@ def score(args):
     workspace = Path(args.workspace).resolve()
     artifact_path = _resolve(workspace, args.artifact)
     artifact = pickle.loads(artifact_path.read_bytes())
-    if artifact.get("backend") != BACKEND:
-        raise ValueError(f"artifact backend must be {BACKEND}")
+    if artifact.get("backend") != BACKEND or artifact.get("text_policy") != TEXT_POLICY:
+        raise ValueError(f"artifact must use backend {BACKEND} and text policy {TEXT_POLICY}; retrain old adapters")
     ids = read_ids(_resolve(workspace, args.ids))
     texts = load_resume_texts(workspace, ids)
     rows = [{"candidate_id": cid, "text": texts[cid]} for cid in ids]

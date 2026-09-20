@@ -50,7 +50,7 @@ PHYSICAL_PROMPT = SYSTEM_PROMPT + """
 新代码和结果只写入本次指定的产物目录。检查 ID 覆盖、数量、重复、数据拆分和模型/特征一致性。
 严格执行本 system prompt 末尾的 proxy skill 与实验变体；control/paper_skill 的 backend 必须是 `qwen_direct`，cascade/combined 的 backend 必须是 `lr_qwen_cascade`，paper_skill_lr 的 backend 必须是 `embedding_lr_paper_skill`，paper_skill_qwen_online 的 backend 必须是 `qwen_online_lora`，不得静默切换。
 仅 control/paper_skill/cascade/combined 变体在本次 implementation.py 中自行用 transformers/torch 加载 Qwen 并比较 A/B 下一 token logits；不得改成 Qwen embedding + LR 或远程 Qwen API。这些旧变体纯 CPU 加载使用 `AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32).to('cpu').eval()`，禁止 `device_map`、`low_cpu_mem_usage=True` 和 `torch.set_default_device`。paper_skill_qwen_online 不适用这条 CPU/next-token 规则：只能调用仓库的 okagent.qwen_online_trainer 在 GPU 上训练和评分，不能自行改写其模型实现。
-需要 Qwen 时，tokenizer 使用 `truncation=True,max_length=1024`，分数按模型名、岗位、文本、prompt、截断配置和 demonstrations 哈希增量缓存，重跑不得重复计算。paper_skill_lr 禁止导入或调用 Qwen/transformers/torch。不要把 Qwen 权重复制进工作区。
+旧 Qwen direct/cascade 变体使用 `truncation=True,max_length=1024`；paper_skill_qwen_online 必须由训练器分块覆盖全部 unstructured 文本，不得截断。分数按模型名、岗位、文本和预处理配置增量缓存，重跑不得重复计算。paper_skill_lr 禁止导入或调用 Qwen/transformers/torch。不要把 Qwen 权重复制进工作区。
 主动采样从 SemanticOperator('.').cached_labels() 的键排除全部已标注 ID，不能只用启动时的训练文件；读取行数组时提取 row['candidate_id']，不能把整个字典转成字符串当 ID。
 inputs 字典的每个值都是一个且仅一个工作区相对路径，禁止自行按空格/逗号拆分或把多个路径连接成一个路径。proxy 收到 train_round_* 时必须逐个 json.load、按 candidate_id 去重合并，并把合并表另存为本次产物目录内的 cumulative_train.json。
 Deploy 根据 artifact backend 恢复 Qwen direct、在线训练 Qwen、LR→Qwen cascade 或 paper-skill embedding LR；验证和全库必须使用完全相同的评分路径并优先复用缓存，自检同一 ID 的分数一致。
@@ -223,8 +223,9 @@ class LogicalOperators:
             if not metadata_path.is_file():
                 raise ValueError("online Qwen proxy requires trainer metadata.json next to proxy.pkl")
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            if metadata.get("backend") != "qwen_online_lora":
-                raise ValueError("online Qwen proxy backend must be qwen_online_lora")
+            from .qwen_online_trainer import TEXT_POLICY
+            if metadata.get("backend") != "qwen_online_lora" or metadata.get("text_policy") != TEXT_POLICY:
+                raise ValueError("online Qwen proxy must use Qwen LoRA and full unstructured text chunks")
             adapter_name = metadata.get("adapter_path")
             if not isinstance(adapter_name, str) or Path(adapter_name).is_absolute() or ".." in Path(adapter_name).parts:
                 raise ValueError("online Qwen proxy adapter path must be workspace-relative")

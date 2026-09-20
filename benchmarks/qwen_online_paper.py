@@ -14,7 +14,7 @@ import duckdb
 
 from okagent.data import write_json
 from okagent.evaluation import evaluate
-from okagent.qwen_online_trainer import DEFAULT_MODEL
+from okagent.qwen_online_trainer import DEFAULT_MODEL, TEXT_POLICY
 from okagent.semantic import SemanticOperator
 
 
@@ -86,8 +86,9 @@ def run(run_dir, model_name):
                  "--validation", output / "validation.json", "--output-dir", first,
                  "--device", "cuda", "--seed", 42, log=output / "round_0.log")
     first_meta = _read(first / "metadata.json")
-    if first_meta["model_name"] != model_name or not first_meta["proxy_valid"]:
-        raise ValueError("initial Qwen proxy is invalid or uses the wrong model")
+    if (first_meta["model_name"] != model_name or not first_meta["proxy_valid"]
+            or first_meta.get("text_policy") != TEXT_POLICY):
+        raise ValueError("initial Qwen proxy is invalid, wrong-model, or uses a truncated-text adapter")
     pool_path = output / "unlabeled_pool.json"
     pool_scores_path = output / "round_0_pool_scores.json"
     if pool_scores_path.exists():
@@ -155,6 +156,7 @@ def run(run_dir, model_name):
                  "--seed", 42, log=output / "round_1.log")
     final_meta = _read(final / "metadata.json")
     if (final_meta["model_name"] != model_name or not final_meta["proxy_valid"] or
+            final_meta.get("text_policy") != TEXT_POLICY or
             final_meta["train_count"] != len(train) + len(al_rows)):
         raise ValueError("final Qwen proxy is invalid, wrong-model, or missed training rounds")
     write_json(output / "universe_ids.json", universe)

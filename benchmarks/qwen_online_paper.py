@@ -6,6 +6,7 @@ The teacher budget and successful labels remain in SemanticOperator's SQLite led
 import argparse
 import json
 import math
+import random
 import subprocess
 import sys
 from pathlib import Path
@@ -45,22 +46,42 @@ def _rho(rows):
     return max(positive, negative) / min(positive, negative) if min(positive, negative) else None
 
 
+def _label_missing(semantic, ids):
+    cached = semantic.cached_labels()
+    pending = [cid for cid in ids if cid not in cached]
+    if pending:
+        semantic.label_many(pending, workers=8)
+    cached = semantic.cached_labels()
+    if any(cid not in cached for cid in ids):
+        raise ValueError("teacher labeling is incomplete; retry this run to reuse successful labels")
+    return cached
+
+
 def run(run_dir, model_name):
     run_dir = Path(run_dir).resolve()
     workspace = run_dir / "workspace"
     output = workspace / "output/qwen_online_paper"
     output.mkdir(parents=True, exist_ok=True)
     semantic = SemanticOperator(workspace)
-    validation_pool = set(_read(workspace / "continuation_validation_pool.json"))
-    validation_sample = sorted(set(_read(workspace / "continuation_validation_sample.json")))
-    if not set(validation_sample).issubset(validation_pool):
-        raise ValueError("validation sample must be contained in the fixed validation pool")
     with duckdb.connect(str(workspace / "data.duckdb"), read_only=True) as con:
         universe = sorted(row[0] for row in con.execute(
             "SELECT DISTINCT candidate_id FROM candidate_segments ORDER BY candidate_id").fetchall())
-    cached = semantic.cached_labels()
-    if any(cid not in cached for cid in validation_sample):
-        raise ValueError("fixed validation sample must already be fully labeled")
+    pool_file = workspace / "continuation_validation_pool.json"
+    sample_file = workspace / "continuation_validation_sample.json"
+    if not pool_file.exists() and not sample_file.exists():
+        rng = random.Random(42)
+        validation_pool = set(rng.sample(universe, round(len(universe) * 0.2)))
+        validation_sample = sorted(rng.sample(sorted(validation_pool), 400))
+        write_json(pool_file, sorted(validation_pool))
+        write_json(sample_file, validation_sample)
+    elif pool_file.exists() and sample_file.exists():
+        validation_pool = set(_read(pool_file))
+        validation_sample = sorted(set(_read(sample_file)))
+    else:
+        raise ValueError("validation pool and sample must both exist or both be absent")
+    if not set(validation_sample).issubset(validation_pool) or not validation_pool.issubset(set(universe)):
+        raise ValueError("fixed validation split must belong to the full population")
+    cached = _label_missing(semantic, validation_sample)
     validation = [{"candidate_id": cid, "label": cached[cid]} for cid in validation_sample]
     cold_start_path = output / "train_round_0.json"
     if cold_start_path.exists():
@@ -68,8 +89,24 @@ def run(run_dir, model_name):
         if any(cached.get(row["candidate_id"]) != row["label"] for row in train):
             raise ValueError("cached cold-start labels changed")
     else:
-        train = [{"candidate_id": cid, "label": cached[cid]}
-                 for cid in sorted(cached) if cid not in validation_pool]
+        cold_ids_path = output / "cold_start_ids.json"
+        if cold_ids_path.exists():
+            cold_ids = _read(cold_ids_path)
+        else:
+            cold_ids = sorted(random.Random(43).sample(
+                [cid for cid in universe if cid not in validation_pool], 100))
+            write_json(cold_ids_path, cold_ids)
+        cached = _label_missing(semantic, cold_ids)
+        while len({cached[cid] for cid in cold_ids}) < 2:
+            available = [cid for cid in universe if cid not in validation_pool and cid not in cold_ids]
+            count = min(100, semantic.usage()["remaining"], len(available))
+            if count == 0:
+                raise ValueError("teacher budget exhausted before random cold start found both classes")
+            extra = random.Random(43 + len(cold_ids)).sample(available, count)
+            cold_ids = sorted(cold_ids + extra)
+            write_json(cold_ids_path, cold_ids)
+            cached = _label_missing(semantic, cold_ids)
+        train = [{"candidate_id": cid, "label": cached[cid]} for cid in cold_ids]
     if len({row["label"] for row in train}) < 2:
         raise ValueError("random cold-start labels need both classes before Qwen training")
     write_json(output / "validation.json", validation)

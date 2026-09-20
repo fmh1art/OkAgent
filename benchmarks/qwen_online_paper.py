@@ -169,6 +169,36 @@ def run(run_dir, model_name):
               "sampling_trace": trace, "pure_proxy": pure_metrics,
               "hybrid": hybrid_metrics, "usage": semantic.usage()}
     write_json(output / "report.json", report)
+    (output / "report.md").write_text(
+        f"# Qwen online paper-skill full experiment\n\n"
+        f"- Model: `{model_name}`; backend: `qwen_online_lora`\n"
+        f"- Population: {len(universe)}; teacher calls: {report['usage']['llm_calls']}/"
+        f"{report['usage']['max_calls']}\n"
+        f"- Fixed random validation: {len(validation)} candidates, "
+        f"{sum(row['label'] for row in validation)} positives\n"
+        f"- Random cold start: {len(train)} labels, {sum(row['label'] for row in train)} positives\n"
+        f"- Minority-stratum AL: {len(al_rows)} labels, "
+        f"{sum(row['label'] for row in al_rows)} positives; "
+        f"hit rate {trace[-1]['hit_rate']:.4f}; rho "
+        f"{trace[-1]['rho_before']:.2f} → {trace[-1]['rho_after']:.2f}\n"
+        f"- Final Qwen training: {final_meta['train_count']} labels, "
+        f"{final_meta['train_positive']} positives; validation threshold "
+        f"{final_meta['threshold']:.17g}, recall "
+        f"{final_meta['validation_metrics']['recall']:.4f}, precision "
+        f"{final_meta['validation_metrics']['precision']:.4f}\n"
+        f"- Pure proxy: recall {pure_metrics['recall']:.4f}, "
+        f"precision {pure_metrics['precision']:.4f}, selected {pure_metrics['selected_count']}\n"
+        f"- Cached-label hybrid: recall {hybrid_metrics['recall']:.4f}, "
+        f"precision {hybrid_metrics['precision']:.4f}, selected {hybrid_metrics['selected_count']}\n\n"
+        "Validation recall is an empirical estimate on a small number of positives, not a guarantee. "
+        "Final evaluation uses the benchmark's historical labels, which may differ from the current teacher.\n",
+        encoding="utf-8")
+    experiment_path = run_dir / "experiment.json"
+    experiment = _read(experiment_path) if experiment_path.exists() else {}
+    experiment.update(status="completed", execution="qwen_online_paper_pipeline",
+                      model_name=model_name, teacher_calls=report["usage"]["llm_calls"],
+                      report=str(output / "report.json"))
+    write_json(experiment_path, experiment)
     print(json.dumps({"report": str(output / "report.json"), "usage": report["usage"],
                       "pure_proxy": pure_metrics, "hybrid": hybrid_metrics}, ensure_ascii=False), flush=True)
 

@@ -32,6 +32,19 @@ expert models are then refit on the complete frozen training set.
 
 Use exactly one frozen 2,000-ID source. For the completed Qwen-Doubao run:
 
+First inventory historical ID sources without exporting candidate IDs:
+
+```bash
+python -m benchmarks.recover_job01_protocol \
+  --root results/comparison \
+  --output reports/protocol/job01_id_source_inventory.json
+```
+
+The inventory records counts, SHA-256 ID-set hashes, nearby seed/budget metadata,
+and flags an exact 2,000-ID seed-11 source when found. After reviewing the source,
+freeze it explicitly with `--export-source`; the scanner never guesses among
+ambiguous runs.
+
 ```bash
 python -m benchmarks.multi_proxy_router_job01 \
   --train-ledger results/comparison/qwen_doubao_segment_soft_al_full34761_mc2000_r1/workspace/output/qwen_active_full/teacher.sqlite \

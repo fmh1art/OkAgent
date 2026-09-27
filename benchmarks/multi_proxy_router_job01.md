@@ -94,6 +94,26 @@ as an exactly equivalent weighted two-row expansion), rather than rounding away
 teacher confidence. The router still learns against thresholded `overall`, so it
 can correct systematic expert bias while the final task remains binary ranking.
 
+## Selecting additional batch-label candidates
+
+After an initial router run, select a new training-only batch without reading any
+historical evaluation labels:
+
+```bash
+python -m benchmarks.select_router_batch_candidates \
+  results/comparison/multi_proxy_router_job01_seed11 \
+  --exclude reports/protocol/job01_seed11_sampled_ids.json \
+  --budget 1000 \
+  --seed 12 \
+  --output results/comparison/job01_router_acquisition_round2
+```
+
+The fixed acquisition mixture contains high-score candidates, decision-boundary
+candidates, high expert disagreement, high router disagreement, and a random
+coverage slice. It produces an exact unique budget plus a per-candidate reason
+trace. Pass its `candidate_ids.json` directly to `batch_label_job01`, then combine
+the frozen round-one and round-two ID/label files for the next proxy run.
+
 ## Outputs and evaluation
 
 - `model.pkl`: fitted experts and routers;

@@ -54,6 +54,7 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
         config=config, train_ids=[train_ids], train_ledger=None, batch_labels=None,
         teacher_threshold=.5, expected_train_count=60, output=output,
         folds=3, seed=11, calibration_seed_start=100, calibration_seeds=3,
+        comparison_protocol="architecture_only",
     ))
     assert report["protocol"]["train_count"] == 60
     assert len(report["protocol"]["train_id_sha256"]) == 64
@@ -65,6 +66,10 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
     assert {"global", "experience", "credentials", "expert_mean",
             "stacking_router", "embedding_router"}.issubset(report["metrics"])
     assert (output / "report.json").is_file()
+    markdown = (output / "report.md").read_text(encoding="utf-8")
+    assert "| stacking_router |" in markdown
+    assert report["protocol"]["train_id_sha256"] in markdown
+    assert "architecture comparison only" in markdown
     assert (output / "scores.npz").is_file()
     assert (output / "model.pkl").is_file()
 

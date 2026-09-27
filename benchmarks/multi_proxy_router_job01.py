@@ -159,6 +159,60 @@ def method_metrics(labels: np.ndarray, scores: np.ndarray, *, seeds: list[int]) 
     return result
 
 
+def render_markdown(report: dict) -> str:
+    protocol = report["protocol"]
+    lines = [
+        "# job01 multi-proxy router results", "",
+        "## Protocol", "",
+        f"- Comparison claim: `{protocol['comparison_protocol']}`",
+        f"- Training candidates: {protocol['train_count']:,} "
+        f"(positive target: {protocol['train_positive']:,})",
+        f"- Strict-unsampled candidates: {protocol['unsampled_count']:,} "
+        f"(historical positives: {protocol['unsampled_positive']:,})",
+        f"- Training ID SHA-256: `{protocol['train_id_sha256']}`",
+        f"- Pre-scoring truth scope: `{protocol['pre_scoring_truth_scope']}`",
+        f"- Model seed / OOF folds: {protocol['model_seed']} / {protocol['folds']}",
+        "", "## Ranking metrics", "",
+        "| Method | Unsampled AP | P@R80 | Actual R80 | P@R90 | Actual R90 |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for name, metrics in report["metrics"].items():
+        r80, r90 = metrics["p_at_r80"], metrics["p_at_r90"]
+        lines.append(
+            f"| {name} | {metrics['average_precision']:.4f} | "
+            f"{r80['precision']:.2%} | {r80['recall']:.2%} | "
+            f"{r90['precision']:.2%} | {r90['recall']:.2%} |")
+    lines.extend([
+        "", "## 20-seed recall calibration", "",
+        "| Method | Target | Precision mean±sd | Recall mean±sd | F1 mean±sd | "
+        "Recall achieved | Worst recall | Mean recall LCB |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ])
+    for name, metrics in report["metrics"].items():
+        for target in (80, 90):
+            value = metrics[f"calibration_r{target}"]
+            lines.append(
+                f"| {name} | R{target} | {value['mean_precision']:.2%}±"
+                f"{value['std_precision']:.2%} | {value['mean_recall']:.2%}±"
+                f"{value['std_recall']:.2%} | {value['mean_f1']:.2%}±"
+                f"{value['std_f1']:.2%} | {value['recall_achievement_rate']:.0%} | "
+                f"{value['worst_recall']:.2%} | "
+                f"{value['mean_test_recall_lower_bound']:.2%} |")
+    best = max(report["metrics"], key=lambda name: report["metrics"][name]["average_precision"])
+    lines.extend([
+        "", "## Summary", "",
+        f"Best strict-unsampled AP: **{best}** "
+        f"({report['metrics'][best]['average_precision']:.4f}).", "",
+    ])
+    if protocol["comparison_protocol"] != "usa_seed11_exact":
+        lines.append(
+            "This run is an architecture comparison only. It must not be described "
+            "as exceeding USA until the training ID hash is verified against the exact "
+            "USA seed-11, 2,000-ID protocol.")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def run(args) -> dict:
     data_path, truth_path, _, _ = resolve_job01(args.config)
     with duckdb.connect(str(data_path), read_only=True) as db:
@@ -226,11 +280,13 @@ def run(args) -> dict:
             "unsampled_historical_truth_opened_after_scoring": True,
             "pre_scoring_truth_scope": "none" if args.batch_labels else "frozen_training_ids_only",
             "calibration_seeds": seeds,
+            "comparison_protocol": getattr(args, "comparison_protocol", "architecture_only"),
         },
         "training": ensemble.training_summary_,
         "metrics": metrics,
     }
     write_json(args.output / "report.json", report)
+    (args.output / "report.md").write_text(render_markdown(report), encoding="utf-8")
     return report
 
 
@@ -249,6 +305,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=11)
     p.add_argument("--calibration-seeds", type=int, default=20)
     p.add_argument("--calibration-seed-start", type=int, default=10_000)
+    p.add_argument("--comparison-protocol", choices=("architecture_only", "usa_seed11_exact"),
+                   default="architecture_only",
+                   help="Use usa_seed11_exact only after verifying the training-ID hash")
     return p
 
 

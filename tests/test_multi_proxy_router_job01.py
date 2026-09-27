@@ -70,6 +70,7 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
     assert "| stacking_router |" in markdown
     assert report["protocol"]["train_id_sha256"] in markdown
     assert "architecture comparison only" in markdown
+    assert "Lower-bound-constrained calibration" in markdown
     assert (output / "scores.npz").is_file()
     assert (output / "model.pkl").is_file()
 

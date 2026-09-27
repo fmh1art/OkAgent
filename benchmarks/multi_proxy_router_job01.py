@@ -198,6 +198,27 @@ def render_markdown(report: dict) -> str:
                 f"{value['std_f1']:.2%} | {value['recall_achievement_rate']:.0%} | "
                 f"{value['worst_recall']:.2%} | "
                 f"{value['mean_test_recall_lower_bound']:.2%} |")
+    lines.extend([
+        "", "## Lower-bound-constrained calibration", "",
+        "Thresholds in this table are eligible only when the calibration-set "
+        "Clopper-Pearson 95% Recall lower bound reaches the target.", "",
+        "| Method | Target | Valid seeds | Test precision | Test recall | "
+        "Recall achieved | Mean test Recall LCB |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+    ])
+    for name, metrics in report["metrics"].items():
+        for target in (80, 90):
+            value = metrics[f"lower_bound_calibration_r{target}"]
+            if value["valid_runs"]:
+                cells = (f"{value['mean_precision']:.2%}", f"{value['mean_recall']:.2%}",
+                         f"{value['recall_achievement_rate']:.0%}",
+                         f"{value['mean_test_recall_lower_bound']:.2%}")
+            else:
+                cells = ("—", "—", "—", "—")
+            lines.append(
+                f"| {name} | R{target} | {value['valid_runs']}/"
+                f"{value.get('run_count', len(value['runs']))} | {cells[0]} | "
+                f"{cells[1]} | {cells[2]} | {cells[3]} |")
     best = max(report["metrics"], key=lambda name: report["metrics"][name]["average_precision"])
     lines.extend([
         "", "## Summary", "",

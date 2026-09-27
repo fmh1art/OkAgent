@@ -44,3 +44,22 @@ def test_router_returns_one_candidate_score_per_method():
         assert values.shape == (n,)
         assert np.all((0 <= values) & (values <= 1))
     assert model.training_summary_["candidate_count"] == n
+
+
+def test_router_accepts_continuous_multitask_targets_without_rounding():
+    rng = np.random.default_rng(17)
+    n = 60
+    labels = np.array([0, 1] * 30, dtype=np.int8)
+    features = {name: rng.normal(size=(n, 6)).astype(np.float32)
+                for name in ("global", "experience", "credentials")}
+    presence = {name: np.ones(n, dtype=bool) for name in features}
+    soft = np.linspace(.05, .95, n)
+    expert_labels = {
+        "global": soft,
+        "experience": np.clip(soft + .1, 0, 1),
+        "credentials": np.clip(soft - .1, 0, 1),
+    }
+    model = SectionRouterEnsemble(folds=3, seed=2).fit(
+        features, presence, labels, expert_labels=expert_labels)
+    assert model.training_summary_["expert_positive_mass"]["global"] == soft.sum()
+    assert np.isfinite(model.predict_all(features, presence)["stacking_router"]).all()

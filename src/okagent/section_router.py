@@ -84,6 +84,37 @@ def _multiclass_router(random_state: int):
     )
 
 
+def _target_has_both_outcomes(targets: np.ndarray) -> bool:
+    return float(targets.sum()) > 0 and float((1 - targets).sum()) > 0
+
+
+def _fit_binary_proxy(proxy, matrix: np.ndarray, targets: np.ndarray):
+    """Fit hard labels or class-balanced soft-BCE fractional labels.
+
+    A soft target ``t`` is expanded into a negative row of weight ``1-t`` and a
+    positive row of weight ``t``. Class-mass scaling preserves the hard-label
+    proxy's imbalance correction without rounding the continuous target.
+    """
+    targets = np.asarray(targets, dtype=np.float64)
+    if np.all((targets == 0) | (targets == 1)):
+        proxy.fit(matrix, targets.astype(np.int8))
+    else:
+        expanded = np.concatenate([matrix, matrix], axis=0)
+        labels = np.concatenate([
+            np.zeros(len(targets), dtype=np.int8),
+            np.ones(len(targets), dtype=np.int8),
+        ])
+        negative_mass = float((1 - targets).sum())
+        positive_mass = float(targets.sum())
+        total = negative_mass + positive_mass
+        weights = np.concatenate([
+            (1 - targets) * total / (2 * negative_mass),
+            targets * total / (2 * positive_mass),
+        ])
+        proxy.fit(expanded, labels, logisticregression__sample_weight=weights)
+    return proxy
+
+
 @dataclass
 class ExpertFit:
     name: str
@@ -148,8 +179,9 @@ class SectionRouterEnsemble:
             if set(expert_labels) != set(names):
                 raise ValueError("expert_labels must contain every expert")
             for name in names:
-                values = np.asarray(expert_labels[name], dtype=np.int8)
-                if values.shape != y.shape or not set(np.unique(values)).issubset({0, 1}):
+                values = np.asarray(expert_labels[name], dtype=np.float64)
+                if (values.shape != y.shape or not np.isfinite(values).all() or
+                        np.any(values < 0) or np.any(values > 1)):
                     raise ValueError(f"invalid expert labels for {name}")
                 task_labels[name] = values
         minimum_class = int(np.bincount(y).min())
@@ -165,7 +197,7 @@ class SectionRouterEnsemble:
             mask = masks[name]
             expert_counts[name] = int(mask.sum())
             expert_y = task_labels[name]
-            if len(np.unique(expert_y[mask])) < 2:
+            if not _target_has_both_outcomes(expert_y[mask]):
                 raise ValueError(f"expert {name} does not observe both classes")
             prior = float(expert_y[mask].mean())
             priors[name] = prior
@@ -173,10 +205,11 @@ class SectionRouterEnsemble:
             for train_idx, valid_idx in splitter.split(x[name], y):
                 train_present = train_idx[mask[train_idx]]
                 valid_present = valid_idx[mask[valid_idx]]
-                if len(valid_present) == 0 or len(np.unique(expert_y[train_present])) < 2:
+                if (len(valid_present) == 0 or
+                        not _target_has_both_outcomes(expert_y[train_present])):
                     continue
                 proxy = _binary_proxy(self.seed + expert_index)
-                proxy.fit(x[name][train_present], expert_y[train_present])
+                _fit_binary_proxy(proxy, x[name][train_present], expert_y[train_present])
                 oof[valid_present, expert_index] = proxy.predict_proba(
                     x[name][valid_present])[:, 1]
 
@@ -203,7 +236,7 @@ class SectionRouterEnsemble:
         self.experts = {}
         for expert_index, name in enumerate(names):
             proxy = _binary_proxy(self.seed + expert_index)
-            proxy.fit(x[name][masks[name]], task_labels[name][masks[name]])
+            _fit_binary_proxy(proxy, x[name][masks[name]], task_labels[name][masks[name]])
             self.experts[name] = ExpertFit(name, proxy, priors[name])
         self.expert_names = names
         self.training_summary_ = {
@@ -212,8 +245,8 @@ class SectionRouterEnsemble:
             "folds": folds,
             "experts": expert_counts,
             "expert_priors": priors,
-            "expert_positive_counts": {
-                name: int(task_labels[name][masks[name]].sum()) for name in names
+            "expert_positive_mass": {
+                name: float(task_labels[name][masks[name]].sum()) for name in names
             },
             "router_target_counts": {
                 names[index]: int((routing_target == index).sum())

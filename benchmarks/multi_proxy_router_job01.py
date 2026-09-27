@@ -99,14 +99,14 @@ def load_multitask_labels(path: Path, train_ids: list[str], threshold: float):
     overall = np.asarray([by_id[cid]["overall"] >= threshold for cid in train_ids],
                          dtype=np.int8)
     expert = {
-        "global": overall,
+        "global": np.asarray([by_id[cid]["overall"] for cid in train_ids], dtype=np.float64),
         "experience": np.asarray([
-            (by_id[cid]["experience"] + by_id[cid]["projects"]) / 2 >= threshold
-            for cid in train_ids], dtype=np.int8),
+            (by_id[cid]["experience"] + by_id[cid]["projects"]) / 2
+            for cid in train_ids], dtype=np.float64),
         "credentials": np.asarray([
             (by_id[cid]["education"] + by_id[cid]["technical_skills"] +
-             by_id[cid]["research"]) / 3 >= threshold
-            for cid in train_ids], dtype=np.int8),
+             by_id[cid]["research"]) / 3
+            for cid in train_ids], dtype=np.float64),
     }
     return overall, expert
 

@@ -33,7 +33,7 @@ Local test command (UTF-8 mode):
 
 ```text
 pytest -q
-40 passed, 2 skipped
+41 passed, 2 skipped
 ```
 
 The two skipped tests are pre-existing optional integration paths. A non-UTF-8

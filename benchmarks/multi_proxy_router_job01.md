@@ -89,7 +89,10 @@ python -m benchmarks.multi_proxy_router_job01 \
 
 `global` uses `overall`; `experience` uses the mean of experience/project scores;
 `credentials` uses the mean of education/technical-skill/research scores. The
-router still learns against `overall`, so it can correct systematic expert bias.
+proxy losses use the continuous scores through class-balanced soft BCE (implemented
+as an exactly equivalent weighted two-row expansion), rather than rounding away
+teacher confidence. The router still learns against thresholded `overall`, so it
+can correct systematic expert bias while the final task remains binary ranking.
 
 ## Outputs and evaluation
 

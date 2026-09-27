@@ -61,6 +61,22 @@ def build_batch_payload(job: dict, as_of: str, candidates: Sequence[dict]) -> di
     }
 
 
+def pseudonymize_candidates(candidates: Sequence[dict]) -> tuple[list[dict], dict[str, str]]:
+    """Replace stable internal IDs with request-local references."""
+    wire_rows = []
+    wire_to_real = {}
+    for index, row in enumerate(candidates):
+        real_id = row.get("candidate_id")
+        if not isinstance(real_id, str) or not real_id:
+            raise ValueError("candidate IDs must be non-empty strings")
+        wire_id = f"candidate_{index:03d}"
+        wire_to_real[wire_id] = real_id
+        wire_rows.append({**row, "candidate_id": wire_id})
+    if len(set(wire_to_real.values())) != len(wire_rows):
+        raise ValueError("candidate IDs must be unique within a batch")
+    return wire_rows, wire_to_real
+
+
 def parse_batch_response(content: str, expected_ids: Sequence[str]) -> list[dict]:
     if not isinstance(content, str):
         raise ValueError("response content is not text")

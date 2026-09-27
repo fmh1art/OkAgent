@@ -18,8 +18,9 @@ import requests
 
 from okagent.batch_teacher import (LABEL_DIMENSIONS, BatchResult, SYSTEM_PROMPT,
                                    build_batch_payload, compact_resume, completed_ids,
-                                   export_labels, parse_batch_response, request_id,
-                                   save_failure, save_result, setup_ledger, usage)
+                                   export_labels, parse_batch_response,
+                                   pseudonymize_candidates, request_id, save_failure,
+                                   save_result, setup_ledger, usage)
 from okagent.job01_io import resolve_job01
 
 
@@ -53,13 +54,15 @@ def call_batch(*, candidates: list[dict], job: dict, as_of: str, endpoint: str,
                model: str, key: str, protocol_hash: str, attempts: int = 4):
     ids = [row["candidate_id"] for row in candidates]
     batch_id = request_id(ids, protocol_hash)
+    wire_candidates, wire_to_real = pseudonymize_candidates(candidates)
+    wire_ids = [row["candidate_id"] for row in wire_candidates]
     payload = {
         "model": model, "temperature": 0, "max_tokens": max(512, 220 * len(ids)),
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": json.dumps(
-                build_batch_payload(job, as_of, candidates), ensure_ascii=False)},
+                build_batch_payload(job, as_of, wire_candidates), ensure_ascii=False)},
         ],
     }
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
@@ -86,7 +89,10 @@ def call_batch(*, candidates: list[dict], job: dict, as_of: str, endpoint: str,
                 cumulative_input_tokens += prompt_tokens
                 cumulative_output_tokens += completion_tokens
                 response_model = body.get("model") or response_model
-                rows = parse_batch_response(body["choices"][0]["message"]["content"], ids)
+                rows = parse_batch_response(
+                    body["choices"][0]["message"]["content"], wire_ids)
+                for row in rows:
+                    row["candidate_id"] = wire_to_real[row["candidate_id"]]
                 return BatchResult(
                     batch_id, rows, cumulative_input_tokens, cumulative_output_tokens,
                     response_model, attempt,

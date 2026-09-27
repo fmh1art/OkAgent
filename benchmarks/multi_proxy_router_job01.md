@@ -81,6 +81,9 @@ Token accounting includes every billed HTTP-200 attempt, including malformed JSO
 failed parent batches that are later bisected, and attempts from earlier resumptions.
 The report includes input/output tokens per labeled candidate and completed-request
 reduction versus one request per candidate.
+Stable internal candidate IDs are never sent to the external model: each request
+uses `candidate_000`, `candidate_001`, and so on, then maps validated responses back
+to real IDs locally before writing the ledger.
 
 Then train section-specific experts from the additional labels:
 

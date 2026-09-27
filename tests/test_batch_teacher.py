@@ -3,7 +3,8 @@ import json
 import pytest
 
 from okagent.batch_teacher import (BatchResult, compact_resume, export_labels,
-                                   parse_batch_response, save_failure, save_result, usage)
+                                   parse_batch_response, pseudonymize_candidates,
+                                   save_failure, save_result, usage)
 
 
 def test_parse_batch_response_validates_ids_and_normalizes_scores():
@@ -25,6 +26,17 @@ def test_compact_resume_preserves_sections_and_limits_text():
         ("projects", "ijklmnop"),
     ], max_chars=7, per_section_chars=4)
     assert result == {"projects": "ijkl", "work": "abc"}
+
+
+def test_candidate_ids_are_pseudonymized_per_request():
+    wire, mapping = pseudonymize_candidates([
+        {"candidate_id": "internal-person-a", "sections": {"work": "x"}},
+        {"candidate_id": "internal-person-b", "sections": {"work": "y"}},
+    ])
+    assert [row["candidate_id"] for row in wire] == ["candidate_000", "candidate_001"]
+    assert mapping == {"candidate_000": "internal-person-a",
+                       "candidate_001": "internal-person-b"}
+    assert "internal-person" not in json.dumps(wire)
 
 
 def test_batch_ledger_accounts_request_tokens_once(tmp_path):

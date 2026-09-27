@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import duckdb
 import numpy as np
 
-from benchmarks.multi_proxy_router_job01 import run
+from benchmarks.multi_proxy_router_job01 import load_multitask_labels, run
 
 
 def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
@@ -51,7 +51,7 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
     train_ids.write_text(json.dumps(positive + negative), encoding="utf-8")
     output = tmp_path / "output"
     report = run(SimpleNamespace(
-        config=config, train_ids=train_ids, train_ledger=None, batch_labels=None,
+        config=config, train_ids=[train_ids], train_ledger=None, batch_labels=None,
         teacher_threshold=.5, expected_train_count=60, output=output,
         folds=3, seed=11, calibration_seed_start=100, calibration_seeds=3,
     ))
@@ -65,3 +65,19 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
     assert (output / "report.json").is_file()
     assert (output / "scores.npz").is_file()
     assert (output / "model.pkl").is_file()
+
+
+def test_multiround_batch_labels_merge_without_rounding(tmp_path):
+    first = tmp_path / "round1.json"
+    second = tmp_path / "round2.json"
+    dimensions = {
+        "overall": .73, "education": .4, "experience": .8,
+        "technical_skills": .7, "projects": .6, "research": .2,
+        "evidence_quality": .9, "missing_requirements": [],
+    }
+    first.write_text(json.dumps([{"candidate_id": "a", **dimensions}]), encoding="utf-8")
+    second.write_text(json.dumps([{"candidate_id": "b", **dimensions}]), encoding="utf-8")
+    hard, experts = load_multitask_labels([first, second], ["a", "b"], .5)
+    assert hard.tolist() == [1, 1]
+    assert experts["global"].tolist() == [.73, .73]
+    assert experts["experience"].tolist() == [.7, .7]

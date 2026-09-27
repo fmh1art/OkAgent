@@ -34,8 +34,11 @@ def write_json(path: Path, value) -> None:
 
 def load_train_ids(args) -> list[str]:
     if args.train_ids:
-        rows = read_json(args.train_ids)
-        ids = [row["candidate_id"] if isinstance(row, dict) else row for row in rows]
+        paths = args.train_ids if isinstance(args.train_ids, list) else [args.train_ids]
+        ids = []
+        for path in paths:
+            rows = read_json(path)
+            ids.extend(row["candidate_id"] if isinstance(row, dict) else row for row in rows)
     else:
         with sqlite3.connect(args.train_ledger) as db:
             ids = [row[0] for row in db.execute(
@@ -92,8 +95,15 @@ def load_embedding_groups(data_path: Path, candidate_ids: list[str], groups: dic
     return matrices, presence
 
 
-def load_multitask_labels(path: Path, train_ids: list[str], threshold: float):
-    by_id = {row["candidate_id"]: row for row in read_json(path)}
+def load_multitask_labels(paths: list[Path] | Path, train_ids: list[str], threshold: float):
+    paths = paths if isinstance(paths, list) else [paths]
+    by_id = {}
+    for path in paths:
+        for row in read_json(path):
+            cid = row["candidate_id"]
+            if cid in by_id and by_id[cid] != row:
+                raise ValueError(f"conflicting batch labels for {cid}")
+            by_id[cid] = row
     if not set(train_ids).issubset(by_id):
         raise ValueError("batch labels do not cover every training candidate")
     overall = np.asarray([by_id[cid]["overall"] >= threshold for cid in train_ids],
@@ -181,7 +191,9 @@ def run(args) -> dict:
         "protocol": {
             "job": "job01", "model_seed": args.seed, "folds": args.folds,
             "label_source": label_source, "train_count": len(train_ids),
-            "train_id_source": str((args.train_ids or args.train_ledger).resolve()),
+            "train_id_sources": [str(path.resolve()) for path in (
+                args.train_ids if isinstance(args.train_ids, list) else
+                [args.train_ids or args.train_ledger])],
             "train_id_sha256": hashlib.sha256(
                 "\n".join(sorted(train_ids)).encode()).hexdigest(),
             "train_positive": int(labels.sum()), "unsampled_count": len(unsampled_index),
@@ -200,9 +212,9 @@ def run(args) -> dict:
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     source = p.add_mutually_exclusive_group(required=True)
-    source.add_argument("--train-ids", type=Path)
+    source.add_argument("--train-ids", type=Path, action="append")
     source.add_argument("--train-ledger", type=Path)
-    p.add_argument("--batch-labels", type=Path,
+    p.add_argument("--batch-labels", type=Path, action="append",
                    help="Optional labels.json from batch_label_job01 for expert-specific supervision")
     p.add_argument("--teacher-threshold", type=float, default=0.5)
     p.add_argument("--expected-train-count", type=int, default=2_000)

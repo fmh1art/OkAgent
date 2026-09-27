@@ -112,7 +112,18 @@ The fixed acquisition mixture contains high-score candidates, decision-boundary
 candidates, high expert disagreement, high router disagreement, and a random
 coverage slice. It produces an exact unique budget plus a per-candidate reason
 trace. Pass its `candidate_ids.json` directly to `batch_label_job01`, then combine
-the frozen round-one and round-two ID/label files for the next proxy run.
+the frozen round-one and round-two data for the next proxy run by repeating the
+CLI flags (conflicting duplicate labels are rejected):
+
+```bash
+python -m benchmarks.multi_proxy_router_job01 \
+  --train-ids reports/protocol/job01_seed11_sampled_ids.json \
+  --train-ids results/comparison/job01_router_acquisition_round2/candidate_ids.json \
+  --batch-labels results/comparison/job01_batch_multilabel_seed11/labels.json \
+  --batch-labels results/comparison/job01_batch_multilabel_round2/labels.json \
+  --expected-train-count 3000 \
+  --output results/comparison/multi_proxy_router_multilabel_job01_round2
+```
 
 ## Outputs and evaluation
 

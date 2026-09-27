@@ -77,6 +77,10 @@ on the orchestration thread. The run is resumable. `batch_teacher.sqlite` stores
 while `labels.json` stores candidate-level `overall`, `education`, `experience`,
 `technical_skills`, `projects`, `research`, and `evidence_quality` scores. The API
 key is read only from `_config/llm.json` and is never written to outputs.
+Token accounting includes every billed HTTP-200 attempt, including malformed JSON,
+failed parent batches that are later bisected, and attempts from earlier resumptions.
+The report includes input/output tokens per labeled candidate and completed-request
+reduction versus one request per candidate.
 
 Then train section-specific experts from the additional labels:
 

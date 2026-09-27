@@ -65,6 +65,9 @@ def call_batch(*, candidates: list[dict], job: dict, as_of: str, endpoint: str,
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     error = "unknown"
     fatal = False
+    cumulative_input_tokens = 0
+    cumulative_output_tokens = 0
+    response_model = None
     for attempt in range(1, attempts + 1):
         try:
             response = requests.post(endpoint, headers=headers, json=payload, timeout=(10, 180))
@@ -75,17 +78,25 @@ def call_batch(*, candidates: list[dict], job: dict, as_of: str, endpoint: str,
                     break
             else:
                 body = response.json()
-                rows = parse_batch_response(body["choices"][0]["message"]["content"], ids)
                 token_usage = body.get("usage", {})
+                prompt_tokens = int(token_usage.get("prompt_tokens", 0))
+                completion_tokens = int(token_usage.get("completion_tokens", 0))
+                if prompt_tokens < 0 or completion_tokens < 0:
+                    raise ValueError("negative token usage")
+                cumulative_input_tokens += prompt_tokens
+                cumulative_output_tokens += completion_tokens
+                response_model = body.get("model") or response_model
+                rows = parse_batch_response(body["choices"][0]["message"]["content"], ids)
                 return BatchResult(
-                    batch_id, rows, int(token_usage.get("prompt_tokens", 0)),
-                    int(token_usage.get("completion_tokens", 0)), body.get("model"), attempt,
+                    batch_id, rows, cumulative_input_tokens, cumulative_output_tokens,
+                    response_model, attempt,
                 ), None
         except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:
             error = type(exc).__name__
         if attempt < attempts:
             time.sleep(min(8, 2 ** (attempt - 1)))
-    return None, (batch_id, attempts, error, fatal)
+    return None, (batch_id, attempts, error, fatal, cumulative_input_tokens,
+                  cumulative_output_tokens, response_model)
 
 
 def run(args) -> dict:
@@ -136,8 +147,11 @@ def run(args) -> dict:
                 if result is not None:
                     save_result(ledger, result)
                     continue
-                batch_id, attempts, error, fatal = failure
-                save_failure(ledger, batch_id, len(batch), attempts, error)
+                (batch_id, attempts, error, fatal, input_tokens,
+                 output_tokens, response_model) = failure
+                save_failure(ledger, batch_id, len(batch), attempts, error,
+                             input_tokens=input_tokens, output_tokens=output_tokens,
+                             model=response_model)
                 if fatal:
                     fatal_errors.append(error)
                 elif len(batch) > 1:
@@ -154,9 +168,16 @@ def run(args) -> dict:
     labels = export_labels(ledger)
     (args.output / "labels.json").write_text(
         json.dumps(labels, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    report = {"complete": len(labels) == len(ids), "usage": usage(ledger),
+    token_usage = usage(ledger)
+    unique = max(token_usage["unique_candidates"], 1)
+    report = {"complete": len(labels) == len(ids), "usage": token_usage,
               "failed_candidate_ids": failed_singletons,
-              "mean_candidates_per_request": (len(labels) / max(usage(ledger)["completed_requests"], 1))}
+              "mean_candidates_per_completed_request": (
+                  len(labels) / max(token_usage["completed_requests"], 1)),
+              "input_tokens_per_labeled_candidate": token_usage["input_tokens"] / unique,
+              "output_tokens_per_labeled_candidate": token_usage["output_tokens"] / unique,
+              "completed_request_reduction_vs_single": 1 - (
+                  token_usage["completed_requests"] / unique)}
     (args.output / "report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report

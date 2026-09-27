@@ -131,9 +131,15 @@ def save_result(path: Path, result: BatchResult) -> None:
     setup_ledger(path)
     with sqlite3.connect(path) as db:
         db.execute("BEGIN IMMEDIATE")
-        db.execute("INSERT OR REPLACE INTO requests VALUES (?,?,?,?,?,?,?,NULL)",
-                   (result.request_id, len(result.labels), "complete",
-                    result.input_tokens, result.output_tokens, result.model, result.attempts))
+        db.execute(
+            "INSERT INTO requests VALUES (?,?,?,?,?,?,?,NULL) "
+            "ON CONFLICT(request_id) DO UPDATE SET candidate_count=excluded.candidate_count,"
+            "status='complete',input_tokens=coalesce(requests.input_tokens,0)+excluded.input_tokens,"
+            "output_tokens=coalesce(requests.output_tokens,0)+excluded.output_tokens,"
+            "model=coalesce(excluded.model,requests.model),"
+            "attempts=requests.attempts+excluded.attempts,error=NULL",
+            (result.request_id, len(result.labels), "complete",
+             result.input_tokens, result.output_tokens, result.model, result.attempts))
         db.executemany(
             "INSERT OR REPLACE INTO labels(candidate_id,request_id,labels_json) VALUES (?,?,?)",
             [(row["candidate_id"], result.request_id,
@@ -143,11 +149,19 @@ def save_result(path: Path, result: BatchResult) -> None:
 
 
 def save_failure(path: Path, batch_id: str, candidate_count: int,
-                 attempts: int, error: str) -> None:
+                 attempts: int, error: str, *, input_tokens: int = 0,
+                 output_tokens: int = 0, model: str | None = None) -> None:
     setup_ledger(path)
     with sqlite3.connect(path) as db:
-        db.execute("INSERT OR REPLACE INTO requests VALUES (?,?,?,?,?,?,?,?)",
-                   (batch_id, candidate_count, "failed", None, None, None, attempts, error))
+        db.execute(
+            "INSERT INTO requests VALUES (?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(request_id) DO UPDATE SET candidate_count=excluded.candidate_count,"
+            "status='failed',input_tokens=coalesce(requests.input_tokens,0)+excluded.input_tokens,"
+            "output_tokens=coalesce(requests.output_tokens,0)+excluded.output_tokens,"
+            "model=coalesce(excluded.model,requests.model),"
+            "attempts=requests.attempts+excluded.attempts,error=excluded.error",
+            (batch_id, candidate_count, "failed", input_tokens, output_tokens,
+             model, attempts, error))
         db.commit()
 
 
@@ -159,14 +173,16 @@ def export_labels(path: Path) -> list[dict]:
 
 def usage(path: Path) -> dict:
     with sqlite3.connect(path) as db:
-        row = db.execute(
-            "SELECT count(*),coalesce(sum(candidate_count),0),"
-            "coalesce(sum(input_tokens),0),coalesce(sum(output_tokens),0),"
-            "coalesce(sum(attempts),0) FROM requests WHERE status='complete'").fetchone()
+        complete = db.execute(
+            "SELECT count(*),coalesce(sum(candidate_count),0) "
+            "FROM requests WHERE status='complete'").fetchone()
+        totals = db.execute(
+            "SELECT coalesce(sum(status='failed'),0),coalesce(sum(input_tokens),0),"
+            "coalesce(sum(output_tokens),0),coalesce(sum(attempts),0) FROM requests").fetchone()
         labels = db.execute("SELECT count(*) FROM labels").fetchone()[0]
     return {
-        "completed_requests": row[0], "candidate_slots": row[1],
-        "unique_candidates": labels, "input_tokens": row[2],
-        "output_tokens": row[3], "total_tokens": row[2] + row[3],
-        "attempts": row[4],
+        "completed_requests": complete[0], "failed_requests": totals[0],
+        "candidate_slots": complete[1], "unique_candidates": labels,
+        "input_tokens": totals[1], "output_tokens": totals[2],
+        "total_tokens": totals[1] + totals[2], "attempts": totals[3],
     }

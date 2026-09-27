@@ -3,7 +3,7 @@ import json
 import pytest
 
 from okagent.batch_teacher import (BatchResult, compact_resume, export_labels,
-                                   parse_batch_response, save_result, usage)
+                                   parse_batch_response, save_failure, save_result, usage)
 
 
 def test_parse_batch_response_validates_ids_and_normalizes_scores():
@@ -36,6 +36,20 @@ def test_batch_ledger_accounts_request_tokens_once(tmp_path):
     save_result(ledger, BatchResult("r1", labels, 100, 20, "model", 1))
     assert [row["candidate_id"] for row in export_labels(ledger)] == ["a", "b"]
     assert usage(ledger) == {
-        "completed_requests": 1, "candidate_slots": 2, "unique_candidates": 2,
+        "completed_requests": 1, "failed_requests": 0,
+        "candidate_slots": 2, "unique_candidates": 2,
         "input_tokens": 100, "output_tokens": 20, "total_tokens": 120, "attempts": 1,
+    }
+
+
+def test_failed_billed_response_is_included_in_usage(tmp_path):
+    ledger = tmp_path / "labels.sqlite"
+    save_failure(ledger, "bad", 4, 2, "ValueError",
+                 input_tokens=80, output_tokens=30, model="model")
+    save_failure(ledger, "bad", 4, 1, "ValueError",
+                 input_tokens=20, output_tokens=10, model="model")
+    assert usage(ledger) == {
+        "completed_requests": 0, "failed_requests": 1,
+        "candidate_slots": 0, "unique_candidates": 0,
+        "input_tokens": 100, "output_tokens": 40, "total_tokens": 140, "attempts": 3,
     }

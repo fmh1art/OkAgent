@@ -44,5 +44,6 @@ def test_batch_requests_run_concurrently_but_persist_complete_ledger(tmp_path, m
     ))
     assert report["complete"] is True
     assert report["usage"]["completed_requests"] == 4
-    assert report["mean_candidates_per_request"] == 2
+    assert report["mean_candidates_per_completed_request"] == 2
+    assert report["completed_request_reduction_vs_single"] == .5
     assert len(threads) >= 2

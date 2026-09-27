@@ -7,6 +7,7 @@ for final strict-unsampled diagnostics and repeated recall calibration.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pickle
 import sqlite3
@@ -178,8 +179,11 @@ def run(args) -> dict:
         pickle.dump(ensemble, handle)
     report = {
         "protocol": {
-            "job": "job01", "seed": args.seed, "folds": args.folds,
+            "job": "job01", "model_seed": args.seed, "folds": args.folds,
             "label_source": label_source, "train_count": len(train_ids),
+            "train_id_source": str((args.train_ids or args.train_ledger).resolve()),
+            "train_id_sha256": hashlib.sha256(
+                "\n".join(sorted(train_ids)).encode()).hexdigest(),
             "train_positive": int(labels.sum()), "unsampled_count": len(unsampled_index),
             "unsampled_positive": int(unsampled_labels.sum()),
             "expert_groups": {key: list(value) for key, value in groups.items()},

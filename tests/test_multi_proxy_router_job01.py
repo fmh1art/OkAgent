@@ -56,6 +56,8 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
         folds=3, seed=11, calibration_seed_start=100, calibration_seeds=3,
     ))
     assert report["protocol"]["train_count"] == 60
+    assert len(report["protocol"]["train_id_sha256"]) == 64
+    assert report["protocol"]["model_seed"] == 11
     assert report["protocol"]["unsampled_count"] == 180
     assert report["protocol"]["training_ids_excluded_from_evaluation"] is True
     assert {"global", "experience", "credentials", "expert_mean",

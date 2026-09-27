@@ -19,6 +19,9 @@
 
 - Training IDs are frozen by JSON or an existing teacher SQLite ledger.
 - Training IDs are removed from every strict-unsampled metric.
+- Before scoring, historical-label queries are restricted to the frozen training
+  IDs (or omitted entirely for batch-teacher runs); full unsampled truth is opened
+  only after every candidate score has been frozen.
 - Each expert produces out-of-fold training scores for both routers.
 - Full expert models are fitted only after router training features are frozen.
 - Batch-label input must cover training candidates; calibration/test IDs must not

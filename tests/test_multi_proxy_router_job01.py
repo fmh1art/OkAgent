@@ -60,6 +60,8 @@ def test_multi_proxy_job01_end_to_end_writes_strict_unsampled_report(tmp_path):
     assert report["protocol"]["model_seed"] == 11
     assert report["protocol"]["unsampled_count"] == 180
     assert report["protocol"]["training_ids_excluded_from_evaluation"] is True
+    assert report["protocol"]["unsampled_historical_truth_opened_after_scoring"] is True
+    assert report["protocol"]["pre_scoring_truth_scope"] == "frozen_training_ids_only"
     assert {"global", "experience", "credentials", "expert_mean",
             "stacking_router", "embedding_router"}.issubset(report["metrics"])
     assert (output / "report.json").is_file()

@@ -48,6 +48,26 @@ def load_train_ids(args) -> list[str]:
     return ids
 
 
+def load_truth_subset(path: Path, ids: list[str]) -> dict[str, int]:
+    """Read only frozen training labels; never materialize unsampled truth."""
+    result = {}
+    with duckdb.connect(str(path), read_only=True) as db:
+        for start in range(0, len(ids), 500):
+            part = ids[start:start + 500]
+            placeholders = ",".join("?" for _ in part)
+            result.update(db.execute(
+                f"SELECT candidate_id,llm_pass FROM llm_pass "
+                f"WHERE candidate_id IN ({placeholders})", part).fetchall())
+    if set(result) != set(ids):
+        raise ValueError("historical labels do not cover every frozen training ID")
+    return result
+
+
+def load_all_truth_after_scoring(path: Path) -> dict[str, int]:
+    with duckdb.connect(str(path), read_only=True) as db:
+        return dict(db.execute("SELECT candidate_id,llm_pass FROM llm_pass").fetchall())
+
+
 def load_embedding_groups(data_path: Path, candidate_ids: list[str], groups: dict):
     """Read selected sections once and return candidate-level mean embeddings."""
     index = {cid: pos for pos, cid in enumerate(candidate_ids)}
@@ -144,12 +164,8 @@ def run(args) -> dict:
     with duckdb.connect(str(data_path), read_only=True) as db:
         candidate_ids = [row[0] for row in db.execute(
             "SELECT DISTINCT candidate_id FROM candidate_segments ORDER BY candidate_id").fetchall()]
-    with duckdb.connect(str(truth_path), read_only=True) as db:
-        truth = dict(db.execute("SELECT candidate_id,llm_pass FROM llm_pass").fetchall())
-    if set(candidate_ids) != set(truth):
-        raise ValueError("historical labels do not exactly cover the candidate population")
     train_ids = load_train_ids(args)
-    if not set(train_ids).issubset(truth):
+    if not set(train_ids).issubset(candidate_ids):
         raise ValueError("training IDs are outside job01")
     if args.expected_train_count and len(train_ids) != args.expected_train_count:
         raise ValueError(f"expected {args.expected_train_count} training IDs, got {len(train_ids)}")
@@ -163,7 +179,8 @@ def run(args) -> dict:
             args.batch_labels, train_ids, args.teacher_threshold)
         label_source = "batch_teacher_multitask"
     else:
-        labels = np.asarray([truth[cid] for cid in train_ids], dtype=np.int8)
+        training_truth = load_truth_subset(truth_path, train_ids)
+        labels = np.asarray([training_truth[cid] for cid in train_ids], dtype=np.int8)
         expert_labels = None
         label_source = "historical_binary"
     train_features = {name: matrix[train_index] for name, matrix in matrices.items()}
@@ -173,6 +190,12 @@ def run(args) -> dict:
     )
     all_scores = ensemble.predict_all(matrices, presence)
 
+    # Full historical truth is intentionally opened only after every method score
+    # has been frozen. The only earlier truth read (when batch labels are absent)
+    # is a parameterized query restricted to the frozen training IDs.
+    truth = load_all_truth_after_scoring(truth_path)
+    if set(candidate_ids) != set(truth):
+        raise ValueError("historical labels do not exactly cover the candidate population")
     train_set = set(train_ids)
     unsampled_index = np.asarray([index for index, cid in enumerate(candidate_ids)
                                   if cid not in train_set])
@@ -200,6 +223,8 @@ def run(args) -> dict:
             "unsampled_positive": int(unsampled_labels.sum()),
             "expert_groups": {key: list(value) for key, value in groups.items()},
             "training_ids_excluded_from_evaluation": True,
+            "unsampled_historical_truth_opened_after_scoring": True,
+            "pre_scoring_truth_scope": "none" if args.batch_labels else "frozen_training_ids_only",
             "calibration_seeds": seeds,
         },
         "training": ensemble.training_summary_,

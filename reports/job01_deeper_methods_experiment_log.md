@@ -33,12 +33,18 @@ Local test command (UTF-8 mode):
 
 ```text
 pytest -q
-39 passed, 2 skipped
+40 passed, 2 skipped
 ```
 
 The two skipped tests are pre-existing optional integration paths. A non-UTF-8
 Windows locale initially caused one pre-existing test to decode a UTF-8 prompt as
 GBK; rerunning with `PYTHONUTF8=1` produced the result above.
+
+The test suite includes an end-to-end synthetic DuckDB run of the complete
+multi-proxy pipeline: section loading, candidate-level pooling, three experts,
+OOF routers, strict-unsampled exclusion, repeated calibration, model persistence,
+compressed score output, and JSON report generation. Synthetic metrics are not
+copied into the formal job01 results table.
 
 ## Server experiment results
 

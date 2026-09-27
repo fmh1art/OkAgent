@@ -275,8 +275,8 @@ class SectionRouterEnsemble:
             present[:, index] = mask
         return probabilities, present
 
-    def predict_all(self, features: Mapping[str, np.ndarray],
-                    presence: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]:
+    def predict_with_routing(self, features: Mapping[str, np.ndarray],
+                             presence: Mapping[str, np.ndarray]):
         probabilities, present = self.expert_probabilities(features, presence)
         available = np.maximum(present.sum(axis=1), 1)
         mean = (probabilities * present).sum(axis=1) / available
@@ -285,6 +285,7 @@ class SectionRouterEnsemble:
         results["expert_mean"] = mean
         results["stacking_router"] = self.stacker.predict_proba(
             np.column_stack([probabilities, present]))[:, 1]
+        weights = None
         if self.router is not None:
             global_name = "global" if "global" in self.expert_names else self.expert_names[0]
             raw_weights = self.router.predict_proba(
@@ -295,7 +296,14 @@ class SectionRouterEnsemble:
             row_sum = weights.sum(axis=1, keepdims=True)
             zero = row_sum[:, 0] == 0
             weights[zero] = present[zero]
-            row_sum = np.maximum(weights.sum(axis=1, keepdims=True), 1)
+            row_sum = weights.sum(axis=1, keepdims=True)
+            row_sum[row_sum == 0] = 1
             weights /= row_sum
             results["embedding_router"] = (probabilities * weights).sum(axis=1)
-        return results
+        diagnostics = {"expert_probabilities": probabilities, "presence": present,
+                       "embedding_router_weights": weights}
+        return results, diagnostics
+
+    def predict_all(self, features: Mapping[str, np.ndarray],
+                    presence: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]:
+        return self.predict_with_routing(features, presence)[0]

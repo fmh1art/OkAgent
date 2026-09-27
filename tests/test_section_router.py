@@ -37,13 +37,15 @@ def test_router_returns_one_candidate_score_per_method():
         "credentials": np.ones(n, dtype=bool),
     }
     model = SectionRouterEnsemble(folds=3, seed=11).fit(features, presence, labels)
-    scores = model.predict_all(features, presence)
+    scores, routing = model.predict_with_routing(features, presence)
     assert {"global", "experience", "credentials", "expert_mean",
             "stacking_router"}.issubset(scores)
     for values in scores.values():
         assert values.shape == (n,)
         assert np.all((0 <= values) & (values <= 1))
     assert model.training_summary_["candidate_count"] == n
+    assert routing["embedding_router_weights"].shape == (n, 3)
+    np.testing.assert_allclose(routing["embedding_router_weights"].sum(axis=1), 1)
 
 
 def test_router_accepts_continuous_multitask_targets_without_rounding():

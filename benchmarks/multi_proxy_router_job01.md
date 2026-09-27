@@ -138,12 +138,17 @@ python -m benchmarks.multi_proxy_router_job01 \
 
 - `model.pkl`: fitted experts and routers;
 - `candidate_ids.json` + `scores.npz`: full-population scores;
+- `routing_diagnostics.npz`: per-candidate expert probabilities, section-presence
+  flags, normalized gate weights, and primary expert assignments;
 - `report.json`: strict-unsampled AP, P@R80, P@R90, and 20-seed calibration;
 - `report.md`: automatically rendered metric tables and protocol caveats, written
   when the background experiment finishes without requiring active monitoring;
 - both empirical-recall and 95% Clopper-Pearson lower-bound calibration;
 - Recall achievement rate, worst-seed Recall, mean/std Precision, Recall, F1,
   threshold, and Recall lower bound.
+
+Router weights are renormalized over only the sections present for each candidate;
+missing work/project sections therefore do not shrink the candidate score.
 
 Historical unsampled labels are not used for fitting. They are used only after all
 scores have been produced, for the benchmark diagnostics in `report.json`.

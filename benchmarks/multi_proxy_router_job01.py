@@ -219,6 +219,19 @@ def render_markdown(report: dict) -> str:
                 f"| {name} | R{target} | {value['valid_runs']}/"
                 f"{value.get('run_count', len(value['runs']))} | {cells[0]} | "
                 f"{cells[1]} | {cells[2]} | {cells[3]} |")
+    routing = report["routing"]
+    lines.extend([
+        "", "## Router behavior", "",
+        "| Expert | Primary assignments | Assignment share | Mean gate weight | "
+        "Stacker probability coefficient |",
+        "|---|---:|---:|---:|---:|",
+    ])
+    for name in routing["expert_names"]:
+        lines.append(
+            f"| {name} | {routing['primary_assignment_counts'][name]:,} | "
+            f"{routing['primary_assignment_shares'][name]:.2%} | "
+            f"{routing['mean_embedding_router_weights'][name]:.4f} | "
+            f"{routing['stacker_probability_coefficients'][name]:.4f} |")
     best = max(report["metrics"], key=lambda name: report["metrics"][name]["average_precision"])
     lines.extend([
         "", "## Summary", "",
@@ -263,7 +276,7 @@ def run(args) -> dict:
     ensemble = SectionRouterEnsemble(folds=args.folds, seed=args.seed).fit(
         train_features, train_presence, labels, expert_labels=expert_labels,
     )
-    all_scores = ensemble.predict_all(matrices, presence)
+    all_scores, routing_arrays = ensemble.predict_with_routing(matrices, presence)
 
     # Full historical truth is intentionally opened only after every method score
     # has been frozen. The only earlier truth read (when batch labels are absent)
@@ -283,8 +296,37 @@ def run(args) -> dict:
     args.output.mkdir(parents=True, exist_ok=True)
     write_json(args.output / "candidate_ids.json", candidate_ids)
     np.savez_compressed(args.output / "scores.npz", **all_scores)
+    route_weights = routing_arrays["embedding_router_weights"]
+    if route_weights is None:
+        route_weights = routing_arrays["presence"] / np.maximum(
+            routing_arrays["presence"].sum(axis=1, keepdims=True), 1)
+    np.savez_compressed(
+        args.output / "routing_diagnostics.npz",
+        expert_probabilities=routing_arrays["expert_probabilities"],
+        expert_presence=routing_arrays["presence"],
+        embedding_router_weights=route_weights,
+        primary_expert=np.argmax(route_weights, axis=1),
+    )
     with (args.output / "model.pkl").open("wb") as handle:
         pickle.dump(ensemble, handle)
+    primary = np.argmax(route_weights, axis=1)
+    stacker_coefficients = ensemble.stacker.coef_[0][:len(ensemble.expert_names)]
+    routing_summary = {
+        "expert_names": ensemble.expert_names,
+        "primary_assignment_counts": {
+            name: int((primary == index).sum())
+            for index, name in enumerate(ensemble.expert_names)},
+        "primary_assignment_shares": {
+            name: float((primary == index).mean())
+            for index, name in enumerate(ensemble.expert_names)},
+        "mean_embedding_router_weights": {
+            name: float(route_weights[:, index].mean())
+            for index, name in enumerate(ensemble.expert_names)},
+        "stacker_probability_coefficients": {
+            name: float(stacker_coefficients[index])
+            for index, name in enumerate(ensemble.expert_names)},
+        "diagnostic_file": "routing_diagnostics.npz",
+    }
     report = {
         "protocol": {
             "job": "job01", "model_seed": args.seed, "folds": args.folds,
@@ -304,6 +346,7 @@ def run(args) -> dict:
             "comparison_protocol": getattr(args, "comparison_protocol", "architecture_only"),
         },
         "training": ensemble.training_summary_,
+        "routing": routing_summary,
         "metrics": metrics,
     }
     write_json(args.output / "report.json", report)

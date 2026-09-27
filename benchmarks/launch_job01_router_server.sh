@@ -18,25 +18,34 @@ test -d "$repo/.git"
 test -x "$python_bin"
 test -f "$ledger"
 
-git -C "$repo" fetch origin "$branch"
-if [[ ! -d "$worktree/.git" && ! -f "$worktree/.git" ]]; then
-  test ! -e "$worktree"
-  git -C "$repo" worktree add --detach "$worktree" "origin/$branch"
-fi
-
-expected_commit="$(git -C "$repo" rev-parse "origin/$branch")"
-actual_commit="$(git -C "$worktree" rev-parse HEAD)"
-if [[ "$expected_commit" != "$actual_commit" ]]; then
-  echo "Existing worktree is stale: $actual_commit (expected $expected_commit)" >&2
-  exit 2
-fi
-
-"$python_bin" -c 'import duckdb,numpy,scipy,sklearn'
 mkdir -p "$output"
+if [[ -f "$output/report.json" ]]; then
+  echo "Router experiment is already complete: $output/report.json"
+  exit 0
+fi
 if [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
   echo "Router experiment already running with PID $(cat "$pid_file")"
   exit 0
 fi
+
+git -C "$repo" fetch origin "$branch"
+expected_commit="$(git -C "$repo" rev-parse "origin/$branch")"
+if [[ ! -d "$worktree/.git" && ! -f "$worktree/.git" ]]; then
+  test ! -e "$worktree"
+  git -C "$repo" worktree add --detach "$worktree" "$expected_commit"
+fi
+
+actual_commit="$(git -C "$worktree" rev-parse HEAD)"
+if [[ "$expected_commit" != "$actual_commit" ]]; then
+  if [[ -n "$(git -C "$worktree" status --porcelain)" ]]; then
+    echo "Existing experiment worktree is stale and dirty: $actual_commit " \
+         "(expected $expected_commit)" >&2
+    exit 2
+  fi
+  git -C "$worktree" checkout --detach "$expected_commit"
+fi
+
+"$python_bin" -c 'import duckdb,numpy,scipy,sklearn'
 
 nohup env PYTHONPATH="$worktree/src:$worktree" PYTHONUTF8=1 \
   "$python_bin" -m benchmarks.multi_proxy_router_job01 \

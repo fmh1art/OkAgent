@@ -68,10 +68,12 @@ labels per candidate:
 python -m benchmarks.batch_label_job01 \
   results/comparison/job01_batch_multilabel_seed11 \
   --ids reports/protocol/job01_seed11_sampled_ids.json \
-  --batch-size 6
+  --batch-size 6 \
+  --workers 4
 ```
 
-The run is resumable. `batch_teacher.sqlite` stores request-level token usage once,
+Each worker sends a true multi-candidate request; all SQLite writes remain serialized
+on the orchestration thread. The run is resumable. `batch_teacher.sqlite` stores request-level token usage once,
 while `labels.json` stores candidate-level `overall`, `education`, `experience`,
 `technical_skills`, `projects`, `research`, and `evidence_quality` scores. The API
 key is read only from `_config/llm.json` and is never written to outputs.

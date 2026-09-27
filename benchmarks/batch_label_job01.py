@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import duckdb
@@ -118,25 +119,35 @@ def run(args) -> dict:
     queue = [batch for batch in queue if batch]
     failed_singletons = []
     while queue:
-        batch = queue.pop(0)
-        result, failure = call_batch(
-            candidates=batch, job=job, as_of=as_of, endpoint=endpoint,
-            model=model, key=key, protocol_hash=protocol_hash, attempts=args.attempts,
-        )
-        if result is not None:
-            save_result(ledger, result)
-        else:
-            batch_id, attempts, error, fatal = failure
-            save_failure(ledger, batch_id, len(batch), attempts, error)
-            if fatal:
-                raise RuntimeError(f"fatal batch-teacher error: {error}")
-            # Parsing/context failures are often batch-specific. Bisecting recovers
-            # valid candidates without falling back to N one-candidate requests.
-            if len(batch) > 1:
-                middle = len(batch) // 2
-                queue[0:0] = [batch[:middle], batch[middle:]]
-            else:
-                failed_singletons.append(batch[0]["candidate_id"])
+        wave = [queue.pop(0) for _ in range(min(args.workers, len(queue)))]
+        retry_batches = []
+        fatal_errors = []
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            futures = {pool.submit(
+                call_batch, candidates=batch, job=job, as_of=as_of,
+                endpoint=endpoint, model=model, key=key,
+                protocol_hash=protocol_hash, attempts=args.attempts): batch
+                for batch in wave}
+            for future in as_completed(futures):
+                batch = futures[future]
+                result, failure = future.result()
+                # SQLite writes stay on this orchestration thread even though HTTP
+                # requests run concurrently.
+                if result is not None:
+                    save_result(ledger, result)
+                    continue
+                batch_id, attempts, error, fatal = failure
+                save_failure(ledger, batch_id, len(batch), attempts, error)
+                if fatal:
+                    fatal_errors.append(error)
+                elif len(batch) > 1:
+                    middle = len(batch) // 2
+                    retry_batches.extend([batch[:middle], batch[middle:]])
+                else:
+                    failed_singletons.append(batch[0]["candidate_id"])
+        if fatal_errors:
+            raise RuntimeError(f"fatal batch-teacher error: {fatal_errors[0]}")
+        queue[0:0] = retry_batches
         print(json.dumps({"labeled": len(completed_ids(ledger)), "requested": len(ids),
                           "queued_batches": len(queue), "failed_singletons": len(failed_singletons)}),
               flush=True)
@@ -159,6 +170,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--config", type=Path, default=Path("_config/hiring.json"))
     p.add_argument("--llm-config", type=Path, default=Path("_config/llm.json"))
     p.add_argument("--batch-size", type=int, default=6)
+    p.add_argument("--workers", type=int, default=4,
+                   help="Concurrent multi-candidate requests; SQLite writes remain serialized")
     p.add_argument("--max-chars", type=int, default=8_000)
     p.add_argument("--per-section-chars", type=int, default=2_000)
     p.add_argument("--attempts", type=int, default=4)
@@ -167,7 +180,8 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = parser().parse_args()
-    if min(args.batch_size, args.max_chars, args.per_section_chars, args.attempts) <= 0:
+    if min(args.batch_size, args.workers, args.max_chars,
+           args.per_section_chars, args.attempts) <= 0:
         raise ValueError("batch and retry settings must be positive")
     print(json.dumps(run(args), ensure_ascii=False), flush=True)
 

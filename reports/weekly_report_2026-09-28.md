@@ -100,6 +100,16 @@
 
 Stacking Router 的 AP 比 LR-U 高 0.0420，但仍低于 US、US3、USA 和 Qwen-Doubao；Global proxy 的单点 P@R80 比 Qwen-Doubao 高 1.01 个百分点，但其跨种子稳定性不足。因此，本周结果支持“简历分块 + 多 proxy + router”这一方向，但还不能宣称全面超过已有最佳方法。另因历史实验与本周实验的采样 ID、随机种子并非完全一致，当前对比属于架构级参考，后续需要在同一固定 ID 上重跑才能形成严格结论。
 
+### 实验结果分析
+
+第一，**简历分块本身并不会自动提升效果，关键在于能否正确融合不同视角**。Global proxy 的 AP 为 0.3595，而三个 proxy 直接平均后降至 0.3472，说明把弱的 Credentials 分数等权加入会稀释 Global 的有效信号。OOF Stacking Router 则把 AP 提升到 0.3928：相比 Global 提高 0.0333（相对提升 9.3%），相比 Expert Mean 提高 0.0456（相对提升 13.1%）。这说明 Experience 和 Credentials 虽然单独排序能力较弱，但其中仍包含 Global 没有充分表达的补充证据，前提是由有监督模型学习其权重，而不是简单平均。
+
+第二，**不同指标对应不同使用场景**。Global proxy 的 P@R80 最高，适合强调“召回 80% 时尽量少筛人”的场景；Stacking Router 的 AP 和 P@R90 在本组方法中最高，更适合关心整体排序质量或更高召回目标的场景。但 Global 的 R80 阈值在 20 个校准种子中只有 35% 真正达到目标，因此 11.07% 是一个较好的单点结果，不能理解为稳定性能。实际部署时仍应优先选择跨种子更可靠的阈值，或用召回置信下界约束阈值。
+
+第三，**Embedding Router 目前没有证明“看简历后硬选专家”有效**。它的 AP 仅为 0.2255。主要原因可能包括：2,000 条数据相对高维 Global embedding 太少；“哪个 proxy 的单样本 log-loss 最小”这一三分类标签本身噪声较大；硬选最佳专家也会丢失多个 section 之间的互补信息。现阶段应保留 Stacking 的软融合思路，不宜继续把 Embedding Router 作为主模型扩大训练。
+
+第四，**当前 LR Router 不能替代 Qwen，但显示了可与 Qwen 组合的价值**。Qwen-Doubao 的 AP 为 0.4414，比 Stacking Router 高 0.0486，说明 Qwen 对原始文本中的细粒度语义和岗位要求仍有明显优势；另一方面，Global proxy 的单点 P@R80 为 11.07%，比 Qwen-Doubao 的 10.06% 高 1.01 个百分点，说明 embedding 模型在部分高召回区域可能提供互补排序信号。合理方向不是在 LR 和 Qwen 中二选一，而是把 Qwen 作为更强的文本专家加入 section-aware router。
+
 ## 五、正在运行的实验
 
 截至本周报记录时：
@@ -113,6 +123,48 @@ Batch prompting 的阶段性效率较好：首轮已完成 192 次请求，第�
 ## 六、Qwen 模型说明
 
 本周已完成的是基于现有 embedding 的轻量 LR proxy/router 架构实验，**尚未完成新的 Qwen 多标签训练**。原有 Qwen-Doubao 训练代码和结果均保持不变；本轮正在生成的多维标签，是下一阶段训练多任务 Qwen 或多个 Qwen proxy 的数据基础。因此目前不能把 0.3928 等指标表述为新的 Qwen 结果。
+
+下一阶段可按以下两步把本周方法与 Qwen 连接起来。
+
+### 1. 低成本方案：把 Qwen-Doubao 作为第四个专家
+
+保留现有三个 LR section proxy，增加 Qwen-Doubao 对“JD + 完整简历文本”输出的通过概率，形成四个基础分数：
+
+```text
+Global LR ────────┐
+Experience LR ────┤
+Credentials LR ───┼─> OOF Stacking Router ─> 最终匹配概率
+Qwen-Doubao ──────┘
+```
+
+Stacking 输入由原来的“三个 proxy 概率 + 三个 presence 标志”扩展为“四个专家概率 + section presence 标志”。该实验可以直接回答：Qwen 已经学到的文本语义，与 section embedding 模型提供的结构化证据是否互补。
+
+需要注意，Qwen 在 router 训练集上的分数也必须是 OOF 分数。如果 Qwen-Doubao 已经用这 2,000 人训练过，就不能直接把其训练内预测交给 stacker，否则会产生泄漏。严格做法是对 Qwen 进行相同的 5 折训练并生成 OOF 分数；若计算成本过高，也可以从训练数据中单独留出一组只训练 router 的 calibration set，但不能同时训练 Qwen。
+
+### 2. 完整方案：训练 Section-aware 多任务 Qwen
+
+把一份简历按三个视角组织成带明确边界的文本输入：
+
+| Qwen 分支 | 模型输入 | 训练目标 |
+|---|---|---|
+| Qwen-Global | JD + 完整简历 | `overall` |
+| Qwen-Experience | JD + `work` + `projects` | `(experience + projects) / 2` |
+| Qwen-Credentials | JD + `education` + `awards` + `languages` + `applications` | `(education + technical_skills + research) / 3` |
+
+实现上优先采用“一个共享 Qwen 主干 + 三个回归/分类头”，而不是直接训练三套完整 Qwen：共享主干学习岗位和简历语义，三个任务头分别输出 Global、Experience、Credentials 分数。`evidence_quality` 可以作为样本权重，降低证据不足样本对训练的影响；`missing_requirements` 后续可以增加为辅助多标签任务，使模型显式识别缺失的硬性条件。三个 Qwen 分支的 OOF 输出再交给 Stacking Router 学习最终通过概率。
+
+建议按下表组织对照实验，所有方法必须使用相同的 2,000 个训练 ID、相同的严格未采样测试集和相同的校准种子：
+
+| 实验 | 模型 | 要回答的问题 |
+|---|---|---|
+| E0 | 原始 Qwen-Doubao | 固定协议下的 Qwen 基线是多少 |
+| E1 | 三个 LR proxy + Stacking | 轻量 section 架构的基线是多少 |
+| E2 | Qwen-Doubao + 三个 LR proxy + Stacking | Qwen 与 embedding section 信号是否互补 |
+| E3 | 三头多任务 Qwen + Stacking | 多标签、分 section 监督是否优于单一 overall 标签 |
+| E4 | E3 使用累计 3,000 条分歧采样标签 | 增加主动采样数据能否继续提升 |
+| E4-Random | E3 使用 2,000 条原数据 + 随机 1,000 条 | E4 的提升来自采样策略还是仅来自数据量 |
+
+最终统一报告 Unsampled AP、P@R80、P@R90、20-seed 校准达标率、训练/推理成本。只有 E4 明显超过 E4-Random，才能说明分歧采样本身有效；只有 E2 超过 E0 和 E1，才能证明 LR section proxy 与 Qwen 确实存在可利用的互补性。
 
 ## 七、问题与下一步计划
 

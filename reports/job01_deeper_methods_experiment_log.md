@@ -13,7 +13,8 @@
 | OOF stacking router | Implemented | No in-sample expert predictions are used to train the stacker |
 | Embedding router | Implemented | Global resume embedding selects/weights proxy experts |
 | Recall-constrained calibration | Implemented | 20 seeds, empirical and Clopper-Pearson lower-bound variants |
-| job01 server runs | Pending | Waiting for authenticated non-interactive server access |
+| job01 architecture run | Complete | Existing frozen 2,000-ID ledger; architecture-only protocol |
+| job01 batch multi-label run | Pending | Teacher labels have not yet been generated on job01 |
 
 ## Leakage and fairness controls
 
@@ -51,13 +52,42 @@ copied into the formal job01 results table.
 
 ## Server experiment results
 
-No metrics are recorded yet. Do not fill this table from local synthetic data.
+The first real job01 server experiment completed on 2026-09-28. It reused the
+existing Qwen-Doubao 2,000-candidate ledger and therefore evaluates the proxy and
+router architecture only; it is not an exact USA seed-11 comparison.
 
-| Training labels | Method | Unsampled AP | P@R80 | P@R90 | R80 achievement | R90 achievement |
+| Training labels | Method | Unsampled AP | P@R80 | P@R90 | 20-seed R80 achievement | 20-seed R90 achievement |
 |---|---|---:|---:|---:|---:|---:|
-| Existing frozen 2,000 IDs | Pending | — | — | — | — | — |
+| Existing frozen 2,000 IDs | global | 0.3595 | 11.07% | 4.74% | 35% | 25% |
+| Existing frozen 2,000 IDs | experience | 0.3341 | 4.45% | 2.95% | 60% | 45% |
+| Existing frozen 2,000 IDs | credentials | 0.0767 | 2.13% | 1.59% | 65% | 35% |
+| Existing frozen 2,000 IDs | expert mean | 0.3472 | 7.57% | 5.20% | 55% | 40% |
+| Existing frozen 2,000 IDs | stacking router | **0.3928** | 8.67% | **5.76%** | 60% | 40% |
+| Existing frozen 2,000 IDs | embedding router | 0.2255 | 6.17% | 3.44% | 50% | 45% |
 | Batch multi-label 2,000 IDs | Pending | — | — | — | — | — |
 
-When the server run completes, copy the exact protocol hashes, ID-set source,
-runtime, memory, request/token usage, all method metrics, and comparison against
-LR-U/US/US3/USA into this file.
+Protocol details:
+
+- Comparison claim: `architecture_only`.
+- Training ID SHA-256: `ad8b48f29482d2dfc2af1cf32ef2f8d17ae738e4fabf16e9b5c8ef440b6067fd`.
+- Training candidates / positives: 2,000 / 88.
+- Strict-unsampled candidates / positives: 32,761 / 294.
+- Model seed / OOF folds: 11 / 5.
+- Training IDs were excluded from evaluation and full unsampled truth was opened
+  only after scores were frozen.
+- This run reused an existing ledger, so it made no new teacher-LLM requests;
+  request and token usage are not applicable. Runtime and peak memory were not
+  instrumented in this run.
+
+The stacking router achieved the best AP and P@R90 among the implemented proxy
+methods. The global proxy achieved the best P@R80. Relative to the historical
+USA figures, stacking has lower AP (0.3928 versus 0.4798), but higher point
+precision at R80 and R90 (8.67% versus 5.80%, and 5.76% versus 2.98%). This is
+descriptive only because the training ID protocol has not been proven identical.
+
+The empirical 20-seed recall thresholds were unstable: no method reached either
+target on every seed. The Clopper-Pearson lower-bound-constrained variant was much
+safer (stacking achieved R80 and R90 on 100% of seeds), at lower mean precision
+of 5.75% and 2.51% respectively.
+
+Raw artifacts are preserved in `reports/job01_multi_proxy_router_results/`.

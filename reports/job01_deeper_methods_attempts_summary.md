@@ -16,7 +16,7 @@
 - 严格排除训练样本后计算 AP、P@R80、P@R90，并进行多随机种子 recall 校准；
 - 实验结束后自动写出 JSON 和 Markdown 报告，无需持续监视进程。
 
-实现验证结果为 `47 passed, 2 skipped`，完整合成端到端流程通过。但由于服务器 `mengsq@10.77.110.188` 的 SSH 非交互认证始终失败，本轮没有真正启动 job01 服务器实验，因此目前不能报告新方法在 job01 上的正式 AP、P@R80 或 P@R90，也不能声称其优于 USA 基线。
+实现验证结果为 `47 passed, 2 skipped`，完整合成端到端流程通过。随后在服务器上使用已有 Qwen-Doubao 2,000 候选人 ledger 完成了第一次真实 job01 architecture-only 实验。Stacking router 在新方法中取得最高 AP（0.3928）和最高 P@R90（5.76%），global proxy 取得最高 P@R80（11.07%）。由于训练 ID 尚未证明与 USA seed-11 完全一致，这些数字只能用于架构比较，不能作为严格超越 USA 的结论。
 
 ## 2. 出发点与已有基线
 
@@ -174,43 +174,46 @@ pytest -q
 
 ## 9. job01 正式实验结果
 
-截至本总结完成时，新的 job01 实验状态如下：
+第一次真实 job01 服务器实验已经完成。它复用已有冻结的 2,000 个候选人 ID，其中正例 88 个；strict-unsampled 集合包含 32,761 个候选人和 294 个正例。
 
 | 训练标签 | 方法 | Unsampled AP | P@R80 | P@R90 | 状态 |
 |---|---|---:|---:|---:|---|
-| 已有冻结 2,000 IDs | 三 proxy + routers | — | — | — | 未启动 |
+| 已有冻结 2,000 IDs | global | 0.3595 | **11.07%** | 4.74% | 完成 |
+| 已有冻结 2,000 IDs | experience | 0.3341 | 4.45% | 2.95% | 完成 |
+| 已有冻结 2,000 IDs | credentials | 0.0767 | 2.13% | 1.59% | 完成 |
+| 已有冻结 2,000 IDs | expert mean | 0.3472 | 7.57% | 5.20% | 完成 |
+| 已有冻结 2,000 IDs | stacking router | **0.3928** | 8.67% | **5.76%** | 完成 |
+| 已有冻结 2,000 IDs | embedding router | 0.2255 | 6.17% | 3.44% | 完成 |
 | Batch multi-label 2,000 IDs | 三 proxy + routers | — | — | — | 未启动 |
 | 多轮 disagreement acquisition | 累积重训 | — | — | — | 未启动 |
 
-服务器登录被多次尝试，但 `mengsq@10.77.110.188` 均返回 `Permission denied (publickey,password)`。由于无法建立非交互 SSH 会话，后台 launcher 没有被执行，服务器上也没有本轮进程或结果文件可供等待。因此这里保留空值，而不是用本地合成数据代替。
+本次 run 的 training ID SHA-256 为 `ad8b48f29482d2dfc2af1cf32ef2f8d17ae738e4fabf16e9b5c8ef440b6067fd`，协议标记为 `architecture_only`。训练 ID 已从评估中排除，完整 unsampled truth 只在评分冻结后打开。
 
-这意味着目前还不能回答以下关键实验问题：
+结果说明：
 
-- 三 proxy 或 router 是否超过 USA 的 AP 0.4798；
-- P@R80、P@R90 是否显著改善；
+- Stacking router 相比简单 expert mean 提高 AP 0.0456，并把 P@R90 从 5.20% 提高到 5.76%，说明 OOF 融合有价值。
+- Global proxy 的 AP 和 P@R80 都明显高于 experience 与 credentials；credentials 单独使用表现很差，不能仅凭教育资质 section 排序。
+- Embedding router AP 只有 0.2255，明显低于 stacking router，当前的“先预测最佳 expert”目标不够稳定。
+- 相比历史 USA 数字，stacking AP 较低（0.3928 对 0.4798），但点估计 P@R80/P@R90 较高（8.67%/5.76% 对 5.80%/2.98%）。由于 ID 协议不同，这只是描述性观察。
+- 经验阈值在 20 个校准种子上不稳定；stacking 的 R80/R90 达成率分别只有 60%/40%。采用 Clopper-Pearson 下界约束后，两项目标达成率均为 100%，但平均 precision 降到 5.75%/2.51%。
+- 本次复用已有 teacher ledger，没有产生新的 LLM 请求或 token 开销；运行时间和峰值内存未在本轮埋点。
+
+仍未回答的问题包括：
+
 - batch prompting 相对逐条请求节约了多少 token 和请求；
 - 多维软标签是否优于已有单标签 teacher；
 - disagreement acquisition 是否提高单位标注成本的收益。
 
-## 10. 服务器恢复后的执行方式
+## 10. 后续实验顺序
 
-代码已经推送到远端分支。服务器认证恢复后，可由服务器端直接执行一次后台启动命令：
-
-```bash
-cd /home/mengsq/projects/OkAgent &&
-git fetch origin codex/job01-multi-proxy-router &&
-git show origin/codex/job01-multi-proxy-router:benchmarks/launch_job01_router_server.sh >/tmp/launch_job01_router.sh &&
-bash /tmp/launch_job01_router.sh
-```
-
-launcher 是幂等的：已有进程运行时不会重复启动，已有完整结果时不会覆盖。实验结束后重点读取：
+本次结果保存在：
 
 ```text
 results/comparison/multi_proxy_router_qwen_ids_job01_r1/report.json
 results/comparison/multi_proxy_router_qwen_ids_job01_r1/report.md
 ```
 
-如需先确认是否能恢复 USA seed-11 的精确训练 ID，可运行：
+下一步应先确认是否能恢复 USA seed-11 的精确训练 ID：
 
 ```bash
 python -m benchmarks.recover_job01_protocol \
@@ -220,11 +223,10 @@ python -m benchmarks.recover_job01_protocol \
 
 建议实验顺序为：
 
-1. 先用已有 Qwen-Doubao 2,000 ID ledger 运行 architecture-only 对照，验证完整 job01 管线。
-2. 恢复并冻结 USA seed-11 ID，运行严格可比实验。
-3. 在相同预算下生成 batch multi-label 标签，比较单标签与多标签 teacher。
-4. 追加 disagreement acquisition 轮次，记录累计标签数、调用成本和指标变化。
-5. 把协议哈希、运行时间、峰值内存、请求/token 用量以及各方法指标回填到正式实验日志。
+1. 恢复并冻结 USA seed-11 ID，运行严格可比实验。
+2. 在相同预算下生成 batch multi-label 标签，比较单标签与多标签 teacher。
+3. 追加 disagreement acquisition 轮次，记录累计标签数、调用成本和指标变化。
+4. 为后续 run 增加运行时间与峰值内存埋点。
 
 ## 11. 主要代码与记录位置
 
@@ -233,12 +235,13 @@ python -m benchmarks.recover_job01_protocol \
 - `benchmarks/recover_job01_protocol.py`：seed-11 协议恢复清单。
 - `benchmarks/launch_job01_router_server.sh`：服务器幂等后台启动器。
 - `benchmarks/multi_proxy_router_job01.md`：运行参数与方法说明。
-- `reports/job01_deeper_methods_experiment_log.md`：正式实验状态和待回填指标表。
+- `reports/job01_deeper_methods_experiment_log.md`：正式实验状态和指标表。
+- `reports/job01_multi_proxy_router_results/`：本次服务器实验的原始 JSON 和 Markdown 报告。
 - `tests/test_multi_proxy_router_job01.py`：核心 pipeline 测试。
 - `tests/test_batch_label_job01.py`：batch prompting、恢复和成本核算测试。
 
 ## 12. 总体判断
 
-本轮产出已经把最初的研究想法推进为可执行实验系统，尤其补齐了候选人级简历切分、真正的多候选人 batch prompting、多维连续标签、三个 expert、动态 router、主动选样和严格评估协议。现阶段最重要的结果是“方法已实现且管线验证通过”，而不是模型性能结论。
+本轮产出已经把最初的研究想法推进为可执行实验系统，并获得了第一组真实 job01 架构结果。当前证据支持继续研究 OOF stacking router，但不支持 embedding router 或 credentials-only proxy 作为主要排序器。
 
-下一步的唯一关键依赖是恢复服务器执行权限并完成 job01 正式运行。只有获得真实 report 后，才能对 proxy 数量、路由方式、batch 标签和主动选样的收益作出数据层面的判断。
+下一步重点应从“管线能否运行”转向严格协议和标签效率：恢复 USA seed-11 ID 做可比实验，再运行 batch multi-label 与 disagreement acquisition。只有这些实验完成后，才能判断多标签 teacher 和主动选样是否值得额外的 LLM 成本。

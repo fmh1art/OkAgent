@@ -184,8 +184,8 @@ pytest -q
 | 已有冻结 2,000 IDs | expert mean | 0.3472 | 7.57% | 5.20% | 完成 |
 | 已有冻结 2,000 IDs | stacking router | **0.3928** | 8.67% | **5.76%** | 完成 |
 | 已有冻结 2,000 IDs | embedding router | 0.2255 | 6.17% | 3.44% | 完成 |
-| Batch multi-label 2,000 IDs | 三 proxy + routers | — | — | — | 未启动 |
-| 多轮 disagreement acquisition | 累积重训 | — | — | — | 未启动 |
+| Batch multi-label 2,000 IDs | stacking router | 0.2025 | 5.68% | 3.74% | 完成 |
+| 累计 3,000 IDs（新增 1,000 条分歧采样） | stacking router | 0.0507 | 1.88% | 0.85% | 完成；测试集发生变化 |
 
 本次 run 的 training ID SHA-256 为 `ad8b48f29482d2dfc2af1cf32ef2f8d17ae738e4fabf16e9b5c8ef440b6067fd`，协议标记为 `architecture_only`。训练 ID 已从评估中排除，完整 unsampled truth 只在评分冻结后打开。
 
@@ -198,11 +198,14 @@ pytest -q
 - 经验阈值在 20 个校准种子上不稳定；stacking 的 R80/R90 达成率分别只有 60%/40%。采用 Clopper-Pearson 下界约束后，两项目标达成率均为 100%，但平均 precision 降到 5.75%/2.51%。
 - 本次复用已有 teacher ledger，没有产生新的 LLM 请求或 token 开销；运行时间和峰值内存未在本轮埋点。
 
-仍未回答的问题包括：
+新增 batch multi-label 与分歧采样实验结果：
 
-- batch prompting 相对逐条请求节约了多少 token 和请求；
-- 多维软标签是否优于已有单标签 teacher；
-- disagreement acquisition 是否提高单位标注成本的收益。
+- 2,000 条初始多标签共使用 336 个成功 batch 请求，输入/输出 token 为 3,320,689/1,147,872；1,000 条第二轮标签使用 169 个成功请求，输入/输出 token 为 1,572,959/593,251。相对逐条请求，成功请求数分别减少 83.20% 和 83.10%。由于没有单候选人 token 控制组，不能把请求减少比例直接解释为 token 节省比例。
+- 3,000 条实验的原生 strict-unsampled 集合只剩 123 个正例，而 2,000 条实验有 294 个正例，因此两份原生报告的 AP 不能直接横比。统一排除全部 3,000 个训练 ID 后，公共测试集为 31,761 人、123 个正例。
+- 在公共测试集上，历史二分类、2,000 条多标签、3,000 条多标签的 Stacking AP 分别为 0.0571、0.0372、0.0507；P@R80 分别为 1.95%、1.70%、1.88%；P@R90 分别为 1.09%、0.95%、0.85%。
+- 新增 1,000 条数据使多标签 Stacking AP 相对提升 36.4%，但仍未超过历史二分类模型；当前的多维软标签没有显示出优于历史二分类 teacher 的证据。
+- 第二轮 1,000 人中包含 171 个历史正例，正例率 17.1%，约为原未采样池 0.90% 的 19 倍，说明采样能够强烈富集正例。但第二轮由已有的**二分类 router**选出，且混合了 300 个 top-score 样本；没有 random-1,000 对照，因此不能把模型增益严格归因于 disagreement acquisition。
+- 多标签 Stacking 的 20-seed R80 校准 F1/达标率在 2,000 条实验中为 10.36%/60%，在 3,000 条原生测试集中为 3.65%/50%。测试集正例数和难度不同，因此这里只记录可靠性，不作直接优劣结论。
 
 ## 10. 后续实验顺序
 
@@ -213,7 +216,7 @@ results/comparison/multi_proxy_router_qwen_ids_job01_r1/report.json
 results/comparison/multi_proxy_router_qwen_ids_job01_r1/report.md
 ```
 
-下一步应先确认是否能恢复 USA seed-11 的精确训练 ID：
+下一步仍应确认是否能恢复 USA seed-11 的精确训练 ID：
 
 ```bash
 python -m benchmarks.recover_job01_protocol \
@@ -221,12 +224,13 @@ python -m benchmarks.recover_job01_protocol \
   --output reports/protocol/job01_id_source_inventory.json
 ```
 
-建议实验顺序为：
+建议后续实验顺序为：
 
-1. 恢复并冻结 USA seed-11 ID，运行严格可比实验。
-2. 在相同预算下生成 batch multi-label 标签，比较单标签与多标签 teacher。
-3. 追加 disagreement acquisition 轮次，记录累计标签数、调用成本和指标变化。
-4. 为后续 run 增加运行时间与峰值内存埋点。
+1. 增加“原始 2,000 条 + 随机 1,000 条”的同成本控制组，并统一在排除全部 3,000 ID 的公共测试集上比较，分离数据量与选样策略的贡献。
+2. 分析多标签 teacher 与历史二分类标签的冲突样本，特别检查 `overall >= 0.5` 产生 239 个训练正例、而历史标签只有 88 个正例所体现的标签口径偏移。
+3. 调整多标签到二分类目标的映射或进行 teacher calibration，再重训三个 proxy；当前结果不支持直接用 `overall >= 0.5` 替代历史标签。
+4. 将 Qwen-Doubao 作为第四个 OOF expert 加入 stacking，或训练共享 Qwen 主干的 section 多任务头，验证文本语义与 section embedding 是否互补。
+5. 恢复并冻结 USA seed-11 ID，运行严格可比实验，并为后续 run 增加运行时间与峰值内存埋点。
 
 ## 11. 主要代码与记录位置
 
@@ -237,11 +241,12 @@ python -m benchmarks.recover_job01_protocol \
 - `benchmarks/multi_proxy_router_job01.md`：运行参数与方法说明。
 - `reports/job01_deeper_methods_experiment_log.md`：正式实验状态和指标表。
 - `reports/job01_multi_proxy_router_results/`：本次服务器实验的原始 JSON 和 Markdown 报告。
+- `reports/job01_parallel_multilabel_results/`：两轮 batch 标注、两组多标签模型、采样报告和公共测试集比较。
 - `tests/test_multi_proxy_router_job01.py`：核心 pipeline 测试。
 - `tests/test_batch_label_job01.py`：batch prompting、恢复和成本核算测试。
 
 ## 12. 总体判断
 
-本轮产出已经把最初的研究想法推进为可执行实验系统，并获得了第一组真实 job01 架构结果。当前证据支持继续研究 OOF stacking router，但不支持 embedding router 或 credentials-only proxy 作为主要排序器。
+本轮产出已经把简历 section、多 proxy、OOF router、batch prompting、多标签监督和主动选样连成完整的可恢复实验系统。当前证据继续支持 OOF stacking，不支持 embedding router 或 credentials-only proxy 作为主要排序器。Batch prompting 把成功请求数降低约 83%，而分歧采样显著富集了正例，并使多标签 Stacking AP 在公共测试集上相对提高 36.4%。
 
-下一步重点应从“管线能否运行”转向严格协议和标签效率：恢复 USA seed-11 ID 做可比实验，再运行 batch multi-label 与 disagreement acquisition。只有这些实验完成后，才能判断多标签 teacher 和主动选样是否值得额外的 LLM 成本。
+同时，实验也得到一个明确的负结果：当前多标签标签映射仍弱于历史二分类监督，新增 1,000 条后也没有超过二分类 Stacking。下一步的重点不应继续无控制地增加标签，而应先增加 random-1,000 对照、校准多标签 teacher 的目标口径，并将 section 信号与 Qwen 的文本建模能力进行严格的 OOF 融合。

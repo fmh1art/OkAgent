@@ -14,7 +14,8 @@
 | Embedding router | Implemented | Global resume embedding selects/weights proxy experts |
 | Recall-constrained calibration | Implemented | 20 seeds, empirical and Clopper-Pearson lower-bound variants |
 | job01 architecture run | Complete | Existing frozen 2,000-ID ledger; architecture-only protocol |
-| job01 batch multi-label run | Pending | Teacher labels have not yet been generated on job01 |
+| job01 batch multi-label run | Complete | 2,000 initial labels plus 1,000 disagreement-selected labels |
+| job01 multi-label proxy runs | Complete | 2,000-label baseline and cumulative 3,000-label model |
 
 ## Leakage and fairness controls
 
@@ -110,3 +111,74 @@ safer (stacking achieved R80 and R90 on 100% of seeds), at lower mean precision
 of 5.75% and 2.51% respectively.
 
 Raw artifacts are preserved in `reports/job01_multi_proxy_router_results/`.
+
+## Batch multi-label and disagreement-acquisition results
+
+Both batch-label jobs and both downstream proxy/router runs completed on
+2026-09-28. The first round labeled the same frozen 2,000 IDs as the binary
+architecture run. The second round labeled 1,000 new candidates selected from
+the existing **binary-label router** scores; it was not selected by the new
+multi-label model. No random-1,000 control run exists.
+
+### LLM request and token efficiency
+
+| Label round | Candidates | Completed requests | Request reduction vs. one/request | Input tokens | Output tokens | Total tokens | Protocol SHA-256 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Initial multi-label | 2,000 | 336 | 83.20% | 3,320,689 | 1,147,872 | 4,468,561 | `da18c291c8a7fca42cea06901af262d25ff333b49af3f56551878956a3ff7faa` |
+| Disagreement round | 1,000 | 169 | 83.10% | 1,572,959 | 593,251 | 2,166,210 | `da18c291c8a7fca42cea06901af262d25ff333b49af3f56551878956a3ff7faa` |
+| Combined | 3,000 | 505 | 83.17% | 4,893,648 | 1,741,123 | 6,634,771 | same protocol |
+
+The reduction figure counts completed HTTP requests relative to one request per
+candidate; it is not a measured token reduction because no single-candidate
+token-control run was made. All billed HTTP-200 attempts, including malformed
+responses later retried, remain included in token totals. Proxy interruptions
+caused many zero-token retries, but the SQLite ledgers preserved completed rows
+and allowed exact resumption.
+
+### Native strict-unsampled reports
+
+The initial multi-label run uses the same 2,000-ID hash as the binary run:
+`ad8b48f29482d2dfc2af1cf32ef2f8d17ae738e4fabf16e9b5c8ef440b6067fd`.
+The cumulative 3,000-ID hash is
+`613ec27a1aef6e023410733ccde8fda653df505d82c9f1f5784fdeb6186c528c`.
+
+| Training labels | Best method | Unsampled candidates / positives | AP | P@R80 | P@R90 | R80 calibration F1 | R80 achieved | R90 calibration F1 | R90 achieved |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Multi-label 2,000 | stacking router | 32,761 / 294 | 0.2025 | 5.68% | 3.74% | 10.36% | 60% | 7.17% | 50% |
+| Multi-label cumulative 3,000 | stacking router | 31,761 / 123 | 0.0507 | 1.88% | 0.85% | 3.65% | 50% | 2.13% | 50% |
+
+These two native reports must not be compared directly: the 3,000-label run
+removes the acquired 1,000 candidates from evaluation, and those candidates
+contain 171 of the 294 historical positives that were previously unsampled.
+Consequently, the second test set is much harder and has only 123 positives.
+
+### Common-holdout comparison
+
+For a fair model comparison, all three saved score arrays were re-evaluated on
+the same 31,761 candidates after excluding the union of all 3,000 training IDs.
+This common holdout contains 123 historical positives.
+
+| Training supervision | Method | Common-holdout AP | P@R80 | P@R90 |
+|---|---|---:|---:|---:|
+| Historical binary 2,000 | stacking router | **0.0571** | **1.95%** | **1.09%** |
+| Batch multi-label 2,000 | stacking router | 0.0372 | 1.70% | 0.95% |
+| Batch multi-label + disagreement 3,000 | stacking router | 0.0507 | 1.88% | 0.85% |
+
+Adding the disagreement-selected 1,000 labels improved multi-label stacking AP
+from 0.0372 to 0.0507, a 36.4% relative increase, and P@R80 from 1.70% to
+1.88%. P@R90 decreased from 0.95% to 0.85%. The 3,000-label model still did not
+recover the binary-label stacker's AP or precision. Therefore the experiment
+supports the usefulness of the additional selected data within the multi-label
+setup, but it does **not** show that the current multi-label teacher is better
+than the historical binary teacher.
+
+The selected 1,000 candidates contain 171 historical positives (17.1%), compared
+with 294/32,761 (0.90%) in the original unsampled pool, approximately 19 times
+the base rate. This demonstrates strong positive enrichment by the binary-router
+selection. It does not isolate the causal benefit of disagreement acquisition,
+because there is no random-1,000 control and the acquisition mixture also contains
+300 top-score candidates.
+
+Formal raw artifacts are preserved under
+`reports/job01_parallel_multilabel_results/`. The common-holdout recomputation is
+stored in `common_holdout_comparison.json`.

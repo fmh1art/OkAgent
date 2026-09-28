@@ -1,0 +1,14 @@
+{
+  "budget": 1000,
+  "selected": 1000,
+  "excluded": 2000,
+  "seed": 12,
+  "strategy_counts": {
+    "top": 300,
+    "router_disagreement": 100,
+    "boundary": 250,
+    "coverage": 100,
+    "expert_disagreement": 250
+  },
+  "historical_labels_read": false
+}

@@ -1,0 +1,18 @@
+{
+  "complete": true,
+  "usage": {
+    "completed_requests": 336,
+    "failed_requests": 220,
+    "candidate_slots": 2000,
+    "unique_candidates": 2000,
+    "input_tokens": 3320689,
+    "output_tokens": 1147872,
+    "total_tokens": 4468561,
+    "attempts": 2154
+  },
+  "failed_candidate_ids": [],
+  "mean_candidates_per_completed_request": 5.9523809523809526,
+  "input_tokens_per_labeled_candidate": 1660.3445,
+  "output_tokens_per_labeled_candidate": 573.936,
+  "completed_request_reduction_vs_single": 0.832
+}

@@ -1,0 +1,34 @@
+{
+  "protocol": {
+    "evaluation": "common_holdout_excluding_union_3000",
+    "candidate_count": 31761,
+    "positive_count": 123,
+    "note": "All three model families are evaluated on the same candidates after excluding the union of the initial 2000 IDs and the acquired 1000 IDs."
+  },
+  "metrics": {
+    "binary_2000": {
+      "global": {"average_precision": 0.0613177393, "p_at_r80": 0.0169723984, "p_at_r90": 0.0096630974},
+      "experience": {"average_precision": 0.0445337081, "p_at_r80": 0.0112563957, "p_at_r90": 0.0081712344},
+      "credentials": {"average_precision": 0.0279174915, "p_at_r80": 0.0084932903, "p_at_r90": 0.0063592094},
+      "expert_mean": {"average_precision": 0.0486765317, "p_at_r80": 0.0180050414, "p_at_r90": 0.0098117210},
+      "stacking_router": {"average_precision": 0.0570605182, "p_at_r80": 0.0194997045, "p_at_r90": 0.0108876900},
+      "embedding_router": {"average_precision": 0.0397355789, "p_at_r80": 0.0130238556, "p_at_r90": 0.0078174519}
+    },
+    "multilabel_2000": {
+      "global": {"average_precision": 0.0331179251, "p_at_r80": 0.0126050420, "p_at_r90": 0.0073509934},
+      "experience": {"average_precision": 0.0251710951, "p_at_r80": 0.0124122367, "p_at_r90": 0.0083052750},
+      "credentials": {"average_precision": 0.0143733634, "p_at_r80": 0.0067186240, "p_at_r90": 0.0053046595},
+      "expert_mean": {"average_precision": 0.0374752844, "p_at_r80": 0.0162721893, "p_at_r90": 0.0096968638},
+      "stacking_router": {"average_precision": 0.0371828217, "p_at_r80": 0.0169578623, "p_at_r90": 0.0094904241},
+      "embedding_router": {"average_precision": 0.0237029662, "p_at_r80": 0.0099527000, "p_at_r90": 0.0086556875}
+    },
+    "multilabel_active_3000": {
+      "global": {"average_precision": 0.0463911042, "p_at_r80": 0.0150616157, "p_at_r90": 0.0076816609},
+      "experience": {"average_precision": 0.0297787948, "p_at_r80": 0.0096925788, "p_at_r90": 0.0065711579},
+      "credentials": {"average_precision": 0.0140315927, "p_at_r80": 0.0062838300, "p_at_r90": 0.0056821090},
+      "expert_mean": {"average_precision": 0.0433418764, "p_at_r80": 0.0163501239, "p_at_r90": 0.0084539223},
+      "stacking_router": {"average_precision": 0.0507315874, "p_at_r80": 0.0187642153, "p_at_r90": 0.0084732824},
+      "embedding_router": {"average_precision": 0.0280740399, "p_at_r80": 0.0118039824, "p_at_r90": 0.0093324365}
+    }
+  }
+}

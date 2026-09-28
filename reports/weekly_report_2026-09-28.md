@@ -10,33 +10,58 @@
 
 ### 1. 简历切分与多 Proxy 建模
 
-将每份简历按语义划分为三个视角：
+本实验没有再调用 LLM 对简历重新切段，而是直接使用 job01 数据库 `candidate_segments` 中已有的 section 及其预计算 embedding。首先按 `candidate_id` 聚合数据，再为每位候选人构造三个 2048 维视角：
 
-- **Global proxy**：使用完整简历的 `unstructured` 表征，判断候选人的整体匹配程度；
-- **Experience proxy**：聚合 `projects` 与 `work`，重点判断工作和项目经历；
-- **Credentials proxy**：聚合 `education`、`awards`、`languages` 与 `applications`，重点判断学历、证书和其他资质。
+| Proxy | 读取的 section | 候选人级输入如何构造 | 负责判断的内容 |
+|---|---|---|---|
+| Global | `unstructured` | 读取整份简历对应的 embedding | 候选人与岗位的总体匹配度 |
+| Experience | `projects`、`work` | 对候选人所有项目和工作 section 的 embedding 求均值 | 工作年限、岗位职责、项目经历是否匹配 |
+| Credentials | `education`、`awards`、`languages`、`applications` | 对学历、奖项、语言和申请材料 embedding 求均值 | 学历、资质、语言等条件是否匹配 |
 
-同一候选人在各部分内采用 embedding 均值池化，保证每个候选人只对应一条训练样本和一次损失计算。三个 proxy 均采用已有简历 embedding 上的逻辑回归，以较低成本先验证多专家架构是否有效。
+聚合在训练之前完成：无论一名候选人有 1 段还是 10 段工作经历，在每个 proxy 中都只形成一个向量、贡献一次 loss，避免长简历因为 section 更多而被重复加权。同时为每个 proxy 保存 `presence mask`；若某位候选人缺少对应 section，该 proxy 不参与其动态加权，缺失分数则用训练集中该任务的先验均值填充。
+
+每个 proxy 使用 `StandardScaler(with_mean=False) + LogisticRegression`，参数为 `C=0.25`、`class_weight=balanced`、`solver=liblinear`、`max_iter=2000`。本周已完成的二分类实验中，三个 proxy 都以固定 2,000 名候选人的历史 `llm_pass` 为监督信号。正在运行的多标签实验会改用软标签：Global 学习 `overall`；Experience 学习 `(experience + projects) / 2`；Credentials 学习 `(education + technical_skills + research) / 3`。连续标签通过带样本权重的 soft-BCE 等价展开训练，而不是先粗暴取整成 0/1。
 
 ### 2. 多 Proxy 融合与 Router
 
-实现并比较了三种融合方法：
+为避免 router 直接读取 proxy 对自身训练样本的过拟合分数，先在 2,000 条训练数据上执行 5 折分层交叉验证（`seed=11`）。每一折只用其余 4 折训练三个 proxy，再对留出折预测；拼接五个留出折后，每名训练候选人获得三个真正的 out-of-fold（OOF）概率。只有 router 特征和目标固定之后，三个最终 proxy 才在全部 2,000 条数据上重新拟合。
 
-- **Expert Mean**：直接平均三个 proxy 的预测分数；
-- **OOF Stacking Router**：使用交叉验证产生的 out-of-fold 预测训练二级模型，并加入各简历部分是否存在等特征，避免用训练内预测造成信息泄漏；
-- **Embedding Router**：根据完整简历 embedding 判断当前样本更适合由哪个 proxy 处理，再组合三个 proxy 的结果。
+在相同的三个 proxy 输出之上比较以下方法：
 
-其中 OOF stacking router 可以理解为“让一个二级模型学习三个专家在什么情况下更可信”。
+1. **Expert Mean**：只对该候选人实际存在的 proxy 分数求平均。例如缺少教育等资质 section 时，只平均 Global 和 Experience，而不是把 Credentials 当成 0。
+2. **OOF Stacking Router**：二级逻辑回归的输入是 6 个特征，即三个 OOF 概率和三个 section presence 标志；监督目标仍为候选人的总体 `llm_pass`。模型直接学习不同 proxy 分数的组合系数和截距，输出最终通过概率。这里的“router”不是硬选一个专家，而是对多个专家证据进行有监督融合。
+3. **Embedding Router**：先计算每名训练候选人在三个 OOF proxy 上的二分类 log-loss，把损失最小且 section 存在的 proxy 作为“最佳专家”标签；再用 Global 的完整简历 embedding 训练多分类逻辑回归（`C=0.1`、`class_weight=balanced`）预测三类专家权重。推理时将不存在的专家权重置零，对剩余权重重新归一化，最后计算三个 proxy 分数的加权和。
+
+因此两个 router 的区别是：Stacking 直接根据三个专家“对当前样本打了多少分”学习最终判断；Embedding Router 则试图仅从简历整体表征判断“当前样本应更相信哪个专家”。实验还保存了每名候选人的三个原始分数、section 是否存在、路由权重和最终分数，便于分析 router 的具体选择。
 
 ### 3. Batch Prompting 与多标签标注
 
-实现了可恢复的 LLM 批量标注流程：每个请求同时处理 6 名候选人，共享职位描述和系统提示词，并发执行多个批次，结果写入 SQLite ledger。流程支持失败重试、批次二分、匿名候选人 ID、断点续跑和实际请求/token 统计。
+标注输入使用结构化简历文本而不是 embedding。对每名候选人去掉重复的 `unstructured` 全文，优先保留 `projects`、`work`、`education`、`applications`、`awards` 和 `languages`；每个 section 最多截取 2,000 字符，每名候选人的总输入不超过 8,000 字符。这样既保留了 section 边界，又控制了长简历对上下文窗口和费用的影响。
 
-每份简历不再只有一个二分类标签，而是生成 7 个连续标签：`overall`、`education`、`experience`、`technical_skills`、`projects`、`research`、`evidence_quality`，同时记录缺失的岗位要求。这些标签可用于训练分工更明确的 proxy，也可作为后续多任务 Qwen 的监督数据。
+一次 HTTP 请求放入 6 名候选人，只发送一份共享的岗位描述、硬性要求、加分要求和评估日期。发送前将真实 `candidate_id` 替换为请求内的 `candidate_000` 等临时编号，返回后再映射回真实 ID。模型设置 `temperature=0`，并强制返回 JSON。每名候选人必须返回以下字段：
+
+- 7 个 0—100 整数分数：`overall`、`education`、`experience`、`technical_skills`、`projects`、`research`、`evidence_quality`；
+- `missing_requirements`：简历中缺少证据的硬性岗位要求列表。
+
+程序会逐项校验候选人数量、顺序、临时 ID、分数范围和缺失条件的数据类型；只有整个响应通过校验才写入结果。写入时把 0—100 分归一化为 0—1。当前两个标注任务各使用 2 个并发 worker，总并发为 4，但每个请求本身仍是真正的 6 人 batch prompting，而不是把 6 个单人请求并发发送。
+
+为了支持长时间运行，使用 SQLite WAL ledger 分别记录每次请求的协议哈希、状态、尝试次数、模型名以及输入/输出 token，并以“候选人 ID 列表 + 协议哈希”生成稳定 request ID。程序启动时先查询已经写入的候选人，只处理缺失部分。请求超时或返回格式错误时采用指数退避重试；一个 6 人批次多次失败后会二分为两个 3 人批次，继续失败则拆到单人，从而隔离异常简历。所有 HTTP 请求可以并发，但 SQLite 写入集中在主线程串行执行，避免数据库锁冲突。统计成本时累计所有已计费尝试，而不只计算最终成功请求。
 
 ### 4. 分歧采样
 
-在首轮 2,000 条样本之外，构造了 1,000 条主动采样数据。采样综合考虑高分样本、决策边界样本、proxy 之间的分歧、router 分歧和随机覆盖。需要说明的是，本轮 1,000 条样本由已有的**二分类 router**选出，目前还没有与“随机新增 1,000 条”进行严格对照。
+第二轮不是从未标注池中随机抽 1,000 人，而是读取首轮二分类模型已经冻结的全库分数，并先排除首轮 2,000 个训练 ID。采样过程不读取剩余候选人的历史真值，按固定 `seed=11` 分配五类预算：
+
+| 采样策略 | 数量 | 排序依据 | 目的 |
+|---|---:|---|---|
+| Top score | 300 | OOF Stacking 最终分数从高到低 | 补充模型认为最可能通过的候选人 |
+| Boundary | 250 | `abs(stacking_score - 0.5)` 从小到大 | 补充最接近决策边界、最不确定的样本 |
+| Expert disagreement | 250 | 三个 proxy 分数的标准差从大到小 | 找到整体、经历和资质判断互相冲突的简历 |
+| Router disagreement | 100 | Stacking 与 Embedding Router 分数差的绝对值从大到小 | 找到两种融合机制意见不一致的样本 |
+| Coverage | 100 | 固定随机种子随机排序 | 保留一定的分布覆盖，避免全部集中在难例上 |
+
+五类样本按顺序选择并全局去重；如果同一候选人同时满足多种策略导致某一配额不足，就继续按 boundary 不确定性补足，最终严格得到 1,000 个唯一 ID。程序同时保存每个入选样本的来源策略、三个 proxy 分数、两个 router 分数和专家标准差，便于之后分析哪类采样真正带来提升。
+
+需要特别说明：这 1,000 条数据是由首轮**历史二分类标签训练的 router**选出的，并不是由尚未完成的多标签模型选择；当前也还没有单独运行“随机新增 1,000 条”的同成本控制组。因此，后续即使累计 3,000 条模型优于 2,000 条模型，也只能说明“增加这些分歧样本后有提升”，暂时不能把全部增益归因于主动采样策略本身。
 
 ## 三、已完成实验结果
 

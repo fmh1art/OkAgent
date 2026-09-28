@@ -1,0 +1,62 @@
+{
+  "protocol": {
+    "calibration": "job01-only 20-seed R80 calibration from report.json",
+    "oracle_overwrite": "frozen 2,000 sampled scores overwritten with historical truth; AP on full 34,761 pool"
+  },
+  "methods": {
+    "global": {
+      "unsampled_ap": 0.35946028906561095,
+      "p_at_r80": 0.11069418386491557,
+      "r80_calibration_f1_mean": 0.1924571662936344,
+      "r80_calibration_f1_std": 0.02107713926261906,
+      "r80_calibration_recall_mean": 0.7746808510638299,
+      "r80_achievement_rate": 0.35,
+      "oracle_overwrite_ap": 0.5789582462477898
+    },
+    "experience": {
+      "unsampled_ap": 0.3340719049413092,
+      "p_at_r80": 0.0445230998509687,
+      "r80_calibration_f1_mean": 0.08325766970079733,
+      "r80_calibration_f1_std": 0.0018141621133078382,
+      "r80_calibration_recall_mean": 0.8017021276595745,
+      "r80_achievement_rate": 0.6,
+      "oracle_overwrite_ap": 0.5614392087566322
+    },
+    "credentials": {
+      "unsampled_ap": 0.07668334278126877,
+      "p_at_r80": 0.02131310394653662,
+      "r80_calibration_f1_mean": 0.041512083267863945,
+      "r80_calibration_f1_std": 0.002847183801402185,
+      "r80_calibration_recall_mean": 0.7989361702127659,
+      "r80_achievement_rate": 0.65,
+      "oracle_overwrite_ap": 0.3542404089122305
+    },
+    "expert_mean": {
+      "unsampled_ap": 0.3471730495208479,
+      "p_at_r80": 0.07566527733247835,
+      "r80_calibration_f1_mean": 0.14411906091889476,
+      "r80_calibration_f1_std": 0.01928769512185978,
+      "r80_calibration_recall_mean": 0.7934042553191488,
+      "r80_achievement_rate": 0.55,
+      "oracle_overwrite_ap": 0.5769785634149809
+    },
+    "stacking_router": {
+      "unsampled_ap": 0.39283232209494084,
+      "p_at_r80": 0.0866691149467499,
+      "r80_calibration_f1_mean": 0.15765450341650936,
+      "r80_calibration_f1_std": 0.020511423063311943,
+      "r80_calibration_recall_mean": 0.7934042553191488,
+      "r80_achievement_rate": 0.6,
+      "oracle_overwrite_ap": 0.6063356745118936
+    },
+    "embedding_router": {
+      "unsampled_ap": 0.2255185183900434,
+      "p_at_r80": 0.061683220073183484,
+      "r80_calibration_f1_mean": 0.11348406367463912,
+      "r80_calibration_f1_std": 0.011019639527032358,
+      "r80_calibration_recall_mean": 0.7940425531914894,
+      "r80_achievement_rate": 0.5,
+      "oracle_overwrite_ap": 0.47972227614303686
+    }
+  }
+}

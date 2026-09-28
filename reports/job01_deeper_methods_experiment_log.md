@@ -66,6 +66,25 @@ router architecture only; it is not an exact USA seed-11 comparison.
 | Existing frozen 2,000 IDs | embedding router | 0.2255 | 6.17% | 3.44% | 50% | 45% |
 | Batch multi-label 2,000 IDs | Pending | — | — | — | — | — |
 
+Supplemental metrics for the completed architecture run:
+
+| Method | 20-seed job01 R80 calibration F1 | F1 std. | Mean test recall | Oracle-Overwrite AP |
+|---|---:|---:|---:|---:|
+| global | **19.25%** | 2.11pp | 77.47% | 0.5790 |
+| experience | 8.33% | 0.18pp | 80.17% | 0.5614 |
+| credentials | 4.15% | 0.28pp | 79.89% | 0.3542 |
+| expert mean | 14.41% | 1.93pp | 79.34% | 0.5770 |
+| stacking router | 15.77% | 2.05pp | 79.34% | **0.6063** |
+| embedding router | 11.35% | 1.10pp | 79.40% | 0.4797 |
+
+The calibration values above use job01-only 20-seed stratified calibration with
+an R80 target. They are not the cross-job Shared-Mixture F1 used by LR-U/US/US3/USA,
+and they are not the old single-split maximum-F1 values. Oracle-Overwrite replaces
+the frozen 2,000 sampled candidates' scores with historical binary truth and then
+computes AP on the full 34,761-candidate pool. US and US3 cannot be backfilled for
+P@R80 or Oracle-Overwrite from the current artifacts because their original
+candidate-level score arrays were not saved.
+
 Protocol details:
 
 - Comparison claim: `architecture_only`.
